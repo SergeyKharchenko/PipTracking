@@ -78,8 +78,7 @@ extern double    UnrealizedLoss    = 15;
 
 extern string    MagicNymberSettings = "------------------------------------------------";
 extern string    MagicNumber_Help    = "Should be unique for all charts";
-extern int       MagicNumberUp       = 1234;
-extern int       MagicNumberDown     = 4321;
+extern int       MagicNumber         = 1234;
                                 
 extern string    SupportSettings = "------------------------------------------------";                           
 extern bool      ShowAlerts      = true;
@@ -106,7 +105,9 @@ int
    hedjeWasClosedUp,
    hedjeWasClosedDown,
    hedjeCapturedSLUp,
-   hedjeCapturedSLDown;
+   hedjeCapturedSLDown,
+   magicUp,
+   magicDown;
    
 bool 
    work = true,
@@ -134,26 +135,10 @@ int init()
   {
 //----
 
-   if (MagicNumberUp < 0) 
+   if (MagicNumber < 0) 
    {
       if (ShowAlerts)
-         Alert("MagicNumberUp is invalid");
-      work = false;
-      return; 
-   }     
-   
-   if (MagicNumberDown < 0) 
-   {
-      if (ShowAlerts)
-         Alert("MagicNumberDown is invalid");
-      work = false;
-      return; 
-   }      
-    
-   if (MagicNumberDown == MagicNumberUp) 
-   {
-      if (ShowAlerts)
-         Alert("MagicNumberDown and MagicNumberUp can\'t be the same");
+         Alert("MagicNumber is invalid");
       work = false;
       return; 
    }                   
@@ -350,8 +335,11 @@ int init()
    MATimeframe = TranslatePeriod(MATimeframe);
    BBTimeframe = TranslatePeriod(BBTimeframe);
    
+   int magic = MagicNumber * 10;
+   magicUp = magic;
+   magicDown = magic + 1;
    
-   saveFileName = Symbol() + " " + " " + MagicNumberUp + "-" + MagicNumberDown + ".csv";
+   saveFileName = Symbol() + " " + MagicNumber + ".csv";
    
    LoadSession();
    start();
@@ -443,16 +431,16 @@ int start()
       SaveSession();
       
       // --> Buy    
-      if ((GetOrdersCount(MagicNumberUp, OP_BUY) + GetOrdersCount(MagicNumberUp, OP_SELL)) == 0)
+      if ((GetOrdersCount(magicUp, OP_BUY) + GetOrdersCount(magicUp, OP_SELL)) == 0)
          stateUp = NONE;
 
       if (stateUp == OPPOSITE)
       {
-         if (GetOrdersCount(MagicNumberUp, OP_SELL) > 0)
+         if (GetOrdersCount(magicUp, OP_SELL) > 0)
          {
-            TrailingByIndicator(MagicNumberUp, OP_SELL); 
+            TrailingByIndicator(magicUp, OP_SELL); 
             if (IsIndicatorClose(OP_SELL))
-               TryClose(MagicNumberUp, OP_SELL);
+               TryClose(magicUp, OP_SELL);
          }   
          else
          {
@@ -462,20 +450,20 @@ int start()
        
       if (stateUp == BREAK_EVEN)  
       {
-         Trailing(MagicNumberUp);
+         Trailing(magicUp);
       }
       else   
       {     
          if (IsBreakEven(OP_BUY))
          {
             stateUp = BREAK_EVEN;    
-            Trailing(MagicNumberUp);   
+            Trailing(magicUp);   
          }      
          else
          {   
             if (IsTakeProfit(OP_BUY))
             {
-               TryClose(MagicNumberUp, OP_BUY);
+               TryClose(magicUp, OP_BUY);
             }
                
             if (OpenTrades)
@@ -491,13 +479,13 @@ int start()
                         startMoneyBuy = AccountBalance();  
                         startSessionBuy = TimeCurrent();
                         hedjeWasClosedUp = 0;
-                        ticket = OpenOrderA(Symbol(), OP_BUY, startLot, Ask, sl, 0, 100, NULL, MagicNumberUp, 5, 0, Lime);  
+                        ticket = OpenOrderA(Symbol(), OP_BUY, startLot, Ask, sl, 0, 100, NULL, magicUp, 5, 0, Lime);  
                         if (DisplayError(ticket))
                            stateUp = NONE;
                         break;
 
                      case MULTIPLE:
-                        ticket = OpenOrderA(Symbol(), OP_BUY, lot, Ask, sl, 0, 100, NULL, MagicNumberUp, 5, 0, Lime);  
+                        ticket = OpenOrderA(Symbol(), OP_BUY, lot, Ask, sl, 0, 100, NULL, magicUp, 5, 0, Lime);  
                         if (DisplayError(ticket))
                            stateUp = NONE;
                         break;
@@ -505,7 +493,7 @@ int start()
                      case OPPOSITE:
                         double slValue = GetHedjeSL(OP_SELL, hedjeCapturedSLUp, false);
                         slOp = CastSLToPoints(slValue, OP_SELL);                     
-                        ticket = OpenOrderA(Symbol(), OP_SELL, lot, Bid, slOp, 0, 100, NULL, MagicNumberUp, 5, 0, Red);  
+                        ticket = OpenOrderA(Symbol(), OP_SELL, lot, Bid, slOp, 0, 100, NULL, magicUp, 5, 0, Red);  
                         if (DisplayError(ticket))
                            stateUp = NONE;
                         break;
@@ -517,16 +505,16 @@ int start()
       // <-- Buy
    
       // --> Sell    
-      if ((GetOrdersCount(MagicNumberDown, OP_BUY) + GetOrdersCount(MagicNumberDown, OP_SELL)) == 0)
+      if ((GetOrdersCount(magicDown, OP_BUY) + GetOrdersCount(magicDown, OP_SELL)) == 0)
          stateDown = NONE;
 
       if (stateDown == OPPOSITE)
       {
-         if (GetOrdersCount(MagicNumberDown, OP_BUY) > 0)
+         if (GetOrdersCount(magicDown, OP_BUY) > 0)
          {
-            TrailingByIndicator(MagicNumberDown, OP_BUY);
+            TrailingByIndicator(magicDown, OP_BUY);
             if (IsIndicatorClose(OP_BUY))
-               TryClose(MagicNumberDown, OP_BUY);         
+               TryClose(magicDown, OP_BUY);         
          }   
          else
          {
@@ -536,21 +524,21 @@ int start()
    
       if (stateDown == BREAK_EVEN)   
       {
-         Trailing(MagicNumberDown);  
+         Trailing(magicDown);  
       }
       else
       {
          if (IsBreakEven(OP_SELL))
          {
             stateDown = BREAK_EVEN;    
-            Trailing(MagicNumberDown);     
+            Trailing(magicDown);     
             startSessionSell = -1;      
          }      
          else
          {            
             if (IsTakeProfit(OP_SELL))
             {
-               TryClose(MagicNumberDown, OP_SELL);
+               TryClose(magicDown, OP_SELL);
             }      
       
             if (OpenTrades)
@@ -566,13 +554,13 @@ int start()
                         startMoneySell = AccountBalance();  
                         startSessionSell = TimeCurrent();
                         hedjeWasClosedDown = 0;
-                        ticket = OpenOrderA(Symbol(), OP_SELL, startLot, Bid, sl, 0, 100, NULL, MagicNumberDown, 5, 0, Red);  
+                        ticket = OpenOrderA(Symbol(), OP_SELL, startLot, Bid, sl, 0, 100, NULL, magicDown, 5, 0, Red);  
                         if (DisplayError(ticket))
                            stateDown = NONE;
                         break;
 
                      case MULTIPLE:
-                        ticket = OpenOrderA(Symbol(), OP_SELL, lot, Bid, sl, 0, 100, NULL, MagicNumberDown, 5, 0, Red);  
+                        ticket = OpenOrderA(Symbol(), OP_SELL, lot, Bid, sl, 0, 100, NULL, magicDown, 5, 0, Red);  
                         if (DisplayError(ticket))
                            stateDown = NONE;
                         break;
@@ -580,7 +568,7 @@ int start()
                      case OPPOSITE:
                         slValue = GetHedjeSL(OP_BUY, hedjeCapturedSLDown, false);
                         slOp = CastSLToPoints(slValue, OP_BUY);                     
-                        ticket = OpenOrderA(Symbol(), OP_BUY, lot, Ask, slOp, 0, 100, NULL, MagicNumberDown, 5, 0, Lime);  
+                        ticket = OpenOrderA(Symbol(), OP_BUY, lot, Ask, slOp, 0, 100, NULL, magicDown, 5, 0, Lime);  
                         if (DisplayError(ticket))
                            stateDown = NONE;
                         break;
@@ -602,7 +590,7 @@ int start()
 //+------------------------------------------------------------------+
 void ShowStatistics()
 {
-   string comment = "\r\nTrendTracking\r\n\r\nAccount balance: " + DoubleToStr(AccountBalance(), 2) + "\r\n";
+   string comment = "\r\nPipTracking\r\n\r\nAccount balance: " + DoubleToStr(AccountBalance(), 2) + "\r\n";
    if (isError)
    {
       comment = comment + errorStr + "\r\n"; 
@@ -615,37 +603,37 @@ void ShowStatistics()
       switch (stateUp)
       {
          case SIMPLE:
-            buyStr = "     Target take profit: " + DoubleToStr(GetLastOrderOpenPrice(MagicNumberUp, OP_BUY) + TakeProfit * Point, Digits) + "\r\n";
+            buyStr = "     Target take profit: " + DoubleToStr(GetLastOrderOpenPrice(magicUp, OP_BUY) + TakeProfit * Point, Digits) + "\r\n";
             double targetUnresizedLoss = startMoneyBuy - GetUnrealizedLoss(OP_BUY);
             buyStr = buyStr + "     Target unrealized loss: " + DoubleToStr(targetUnresizedLoss, 2) + "\r\n";
-            currentTotalProfitBuy = GetOrdersProfit(MagicNumberUp);
+            currentTotalProfitBuy = GetOrdersProfit(magicUp);
             break;
          case BREAK_EVEN:   
             buyStr = "     In Break even\r\n";      
-            currentTotalProfitBuy = GetOrdersProfit(MagicNumberUp);
+            currentTotalProfitBuy = GetOrdersProfit(magicUp);
             break;
          case MULTIPLE:
-            currentTotalProfitBuy = GetOrdersProfit(MagicNumberUp);                                            
-            buyStr = "     Target break even trigger: " + DoubleToStr(GetOrdersLots(MagicNumberUp) * ProfitPerLot, 2) + " $\r\n";
+            currentTotalProfitBuy = GetOrdersProfit(magicUp);                                            
+            buyStr = "     Target break even trigger: " + DoubleToStr(GetOrdersLots(magicUp) * ProfitPerLot, 2) + " $\r\n";
             targetUnresizedLoss = startMoneyBuy - GetUnrealizedLoss(OP_BUY);
             buyStr = buyStr + "     Target unrealized loss: " + DoubleToStr(targetUnresizedLoss, 2) + "\r\n";                                         
             break;   
             
          case OPPOSITE:             
-            double previousProfit = GetHedjeProfit(MagicNumberUp, OP_SELL, startSessionBuy); 
-            double currentProfit = GetOrdersProfit(MagicNumberUp);     
+            double previousProfit = GetHedjeProfit(magicUp, OP_SELL, startSessionBuy); 
+            double currentProfit = GetOrdersProfit(magicUp);     
             currentTotalProfitBuy = currentProfit + previousProfit;
                                        
             buyStr = "     Live profit: " + DoubleToStr(currentProfit, 2) + " $\r\n"; 
             buyStr = buyStr + "     Balance of previous hedje orders: " + DoubleToStr(previousProfit, 2) + " $\r\n";                 
-            buyStr = buyStr + "     Target break even trigger: " + DoubleToStr(GetOrdersLots(MagicNumberUp) * ProfitPerLot, 2) + " $\r\n";                 
+            buyStr = buyStr + "     Target break even trigger: " + DoubleToStr(GetOrdersLots(magicUp) * ProfitPerLot, 2) + " $\r\n";                 
             buyStr = buyStr + "     Stop loss use: " + StopLossModeToString(hedjeCapturedSLUp) + "\r\n";
          
-            bool opposoteOrderExist = IsHedjeOrderExist(MagicNumberUp, OP_SELL);
+            bool opposoteOrderExist = IsHedjeOrderExist(magicUp, OP_SELL);
             if ((hedjeWasClosedUp == 1) && !opposoteOrderExist)
                buyStr = buyStr + "     Hedje price: " + DoubleToStr(GetHedjeSL(OP_SELL, hedjeCapturedSLUp, true), Digits) + "\r\n";                
             if (opposoteOrderExist)
-               buyStr = buyStr + "     Hedje stop loss: " + DoubleToStr(GetLastHedjeOrderStopLoss(MagicNumberUp, OP_SELL), Digits) + "\r\n";                                                                                        
+               buyStr = buyStr + "     Hedje stop loss: " + DoubleToStr(GetLastHedjeOrderStopLoss(magicUp, OP_SELL), Digits) + "\r\n";                                                                                        
             break;   
       }
 
@@ -654,36 +642,36 @@ void ShowStatistics()
       switch (stateDown)
       {
          case SIMPLE:
-            sellStr = "     Target take profit: " + DoubleToStr(GetLastOrderOpenPrice(MagicNumberDown, OP_SELL) - TakeProfit * Point, Digits) + "\r\n";
+            sellStr = "     Target take profit: " + DoubleToStr(GetLastOrderOpenPrice(magicDown, OP_SELL) - TakeProfit * Point, Digits) + "\r\n";
             targetUnresizedLoss = startMoneySell - GetUnrealizedLoss(OP_SELL);
             sellStr = sellStr + "     Target unrealized loss: " + DoubleToStr(targetUnresizedLoss, 2) + "\r\n";               
-            currentTotalProfitSell = GetOrdersProfit(MagicNumberDown);
+            currentTotalProfitSell = GetOrdersProfit(magicDown);
             break;
          case BREAK_EVEN:   
             sellStr = "     In Break even\r\n";
-            currentTotalProfitSell = GetOrdersProfit(MagicNumberDown);
+            currentTotalProfitSell = GetOrdersProfit(magicDown);
             break;
          case MULTIPLE:
-            currentTotalProfitSell = GetOrdersProfit(MagicNumberDown);
-            sellStr = "     Target break even trigger: " + DoubleToStr(GetOrdersLots(MagicNumberDown) * ProfitPerLot, 2) + " $\r\n";
+            currentTotalProfitSell = GetOrdersProfit(magicDown);
+            sellStr = "     Target break even trigger: " + DoubleToStr(GetOrdersLots(magicDown) * ProfitPerLot, 2) + " $\r\n";
             targetUnresizedLoss = startMoneySell - GetUnrealizedLoss(OP_SELL);
             sellStr = sellStr + "     Target unrealized loss: " + DoubleToStr(targetUnresizedLoss, 2) + "\r\n";                  
             break;                 
          case OPPOSITE:           
-            currentProfit = GetOrdersProfit(MagicNumberDown);              
-            previousProfit = GetHedjeProfit(MagicNumberDown, OP_BUY, startSessionSell);               
+            currentProfit = GetOrdersProfit(magicDown);              
+            previousProfit = GetHedjeProfit(magicDown, OP_BUY, startSessionSell);               
             currentTotalProfitSell = currentProfit + previousProfit;                                                          
                                   
             sellStr = "     Live profit: " + DoubleToStr(currentProfit, 2) + " $\r\n";                       
             sellStr = sellStr + "     Balance of previous hedje orders: " + DoubleToStr(previousProfit, 2) + " $\r\n";                
-            sellStr = sellStr + "     Target break even trigger: " + DoubleToStr(GetOrdersLots(MagicNumberDown) * ProfitPerLot, 2) + " $\r\n";                                     
+            sellStr = sellStr + "     Target break even trigger: " + DoubleToStr(GetOrdersLots(magicDown) * ProfitPerLot, 2) + " $\r\n";                                     
             sellStr = sellStr + "     Stop loss use: " + StopLossModeToString(hedjeCapturedSLDown) + "\r\n";
          
-            opposoteOrderExist = IsHedjeOrderExist(MagicNumberDown, OP_BUY);
+            opposoteOrderExist = IsHedjeOrderExist(magicDown, OP_BUY);
             if ((hedjeWasClosedDown == 1) && !opposoteOrderExist)
                sellStr = sellStr + "     Hedje price: " + DoubleToStr(GetHedjeSL(OP_BUY, hedjeCapturedSLDown, true), Digits) + "\r\n";
             if (opposoteOrderExist)
-               sellStr = sellStr + "     Hedje stop loss: " + DoubleToStr(GetLastHedjeOrderStopLoss(MagicNumberDown, OP_BUY), Digits) + "\r\n";                  
+               sellStr = sellStr + "     Hedje stop loss: " + DoubleToStr(GetLastHedjeOrderStopLoss(magicDown, OP_BUY), Digits) + "\r\n";                  
          
                
             break;   
@@ -694,13 +682,13 @@ void ShowStatistics()
            "---------------------------------------------------------\r\n" +
            "Buy\r\n" +
            "     Account balance at the session start: " + DoubleToStr(startMoneyBuy, 2) + "\r\n" +
-           "     Lots: " + DoubleToStr(GetOrdersLots(MagicNumberUp), 2) + "\r\n" +
+           "     Lots: " + DoubleToStr(GetOrdersLots(magicUp), 2) + "\r\n" +
            "     Current total profit: " + DoubleToStr(currentTotalProfitBuy, 2) + " $\r\n" +
            buyStr +
            "=========================\r\n" +
            "Sell\r\n" +
            "     Account balance at the session start: " + DoubleToStr(startMoneySell, 2) + "\r\n" +
-           "     Lots: " + DoubleToStr(GetOrdersLots(MagicNumberDown), 2) + "\r\n" +
+           "     Lots: " + DoubleToStr(GetOrdersLots(magicDown), 2) + "\r\n" +
            "     Current total profit: " + DoubleToStr(currentTotalProfitSell, 2) + " $\r\n" +              
            sellStr;
    }
@@ -712,11 +700,10 @@ void ShowStatistics()
 //+------------------------------------------------------------------+
 void CloseAllOrders()
 {
-   TryClose(MagicNumberUp, OP_BUY);
-   TryClose(MagicNumberUp, OP_SELL);
-   TryClose(MagicNumberDown, OP_BUY);
-   TryClose(MagicNumberDown, OP_SELL);
-
+   TryClose(magicUp, OP_BUY);
+   TryClose(magicUp, OP_SELL);
+   TryClose(magicDown, OP_BUY);
+   TryClose(magicDown, OP_SELL);
 }
 //+------------------------------------------------------------------+
 
@@ -741,22 +728,22 @@ bool IsTakeProfit(int type)
    switch (type)
    {
       case OP_BUY:
-         switch (GetOrdersCount(MagicNumberUp, OP_BUY))
+         switch (GetOrdersCount(magicUp, OP_BUY))
          {
             case 0: return (false);
             case 1: 
-               if (Ask >= (GetLastOrderOpenPrice(MagicNumberUp, OP_BUY) + TakeProfit * Point))
+               if (Ask >= (GetLastOrderOpenPrice(magicUp, OP_BUY) + TakeProfit * Point))
                   return (true);
                break;
          }
          break;
          
       case OP_SELL:
-         switch (GetOrdersCount(MagicNumberDown, OP_SELL))         
+         switch (GetOrdersCount(magicDown, OP_SELL))         
          {
             case 0: return (false);
             case 1: 
-               if (Bid <= (GetLastOrderOpenPrice(MagicNumberDown, OP_SELL) - TakeProfit * Point))
+               if (Bid <= (GetLastOrderOpenPrice(magicDown, OP_SELL) - TakeProfit * Point))
                   return (true);
                break;               
          }
@@ -996,13 +983,13 @@ double CalcLot(int type, int state)
    {
       case OP_BUY:
          if (state == OPPOSITE)
-            return (NormalizeLots(GetOrdersLots(MagicNumberUp) * LotHedjeExponent, Symbol()));              
-         return (NormalizeLots(GetLastOrderLots(MagicNumberUp, OP_BUY) * LotExponent, Symbol()));
+            return (NormalizeLots(GetOrdersLots(magicUp) * LotHedjeExponent, Symbol()));              
+         return (NormalizeLots(GetLastOrderLots(magicUp, OP_BUY) * LotExponent, Symbol()));
          
       case OP_SELL:
          if (state == OPPOSITE)
-            return (NormalizeLots(GetOrdersLots(MagicNumberDown) * LotHedjeExponent, Symbol()));
-         return (NormalizeLots(GetLastOrderLots(MagicNumberDown, OP_SELL) * LotExponent, Symbol()));
+            return (NormalizeLots(GetOrdersLots(magicDown) * LotHedjeExponent, Symbol()));
+         return (NormalizeLots(GetLastOrderLots(magicDown, OP_SELL) * LotExponent, Symbol()));
    }   
 }
 //+------------------------------------------------------------------+
@@ -1243,14 +1230,14 @@ int IsOpen(int type)
    switch (type)
    {
       case OP_BUY:            
-         if (GetOrdersCount(MagicNumberUp, OP_SELL) == 0)   // No hedje order
+         if (GetOrdersCount(magicUp, OP_SELL) == 0)   // No hedje order
          {            
-            if (GetOrdersCount(MagicNumberUp, OP_BUY) == 0)
+            if (GetOrdersCount(magicUp, OP_BUY) == 0)
                return (SIMPLE);      
                
             if (!hedjeWasClosedUp)  // First hedje
             {
-               if (IsUnrealizedLoss(MagicNumberUp, OP_BUY))
+               if (IsUnrealizedLoss(magicUp, OP_BUY))
                {
                   int hedjeSLMode = GetHedjeMode(OP_SELL);
                   if (hedjeSLMode != -1)
@@ -1261,7 +1248,7 @@ int IsOpen(int type)
                }     
                else
                {                              
-                  if ((Ask + PipStep * Point) <= GetLastOrderOpenPrice(MagicNumberUp, OP_BUY))
+                  if ((Ask + PipStep * Point) <= GetLastOrderOpenPrice(magicUp, OP_BUY))
                      return (MULTIPLE);      
                }                 
             }
@@ -1274,14 +1261,14 @@ int IsOpen(int type)
          break;
          
       case OP_SELL:        
-         if (GetOrdersCount(MagicNumberDown, OP_BUY) == 0)   // No hedje order
+         if (GetOrdersCount(magicDown, OP_BUY) == 0)   // No hedje order
          {
-            if (GetOrdersCount(MagicNumberDown, OP_SELL) == 0)
+            if (GetOrdersCount(magicDown, OP_SELL) == 0)
                return (SIMPLE);
          
             if (!hedjeWasClosedDown)  // First hedje
             {
-               if (IsUnrealizedLoss(MagicNumberDown, OP_SELL))
+               if (IsUnrealizedLoss(magicDown, OP_SELL))
                {
                   hedjeSLMode = GetHedjeMode(OP_BUY); 
                   if (hedjeSLMode != -1)
@@ -1292,7 +1279,7 @@ int IsOpen(int type)
                }      
                else
                {               
-                  if ((Bid - PipStep * Point) >= GetLastOrderOpenPrice(MagicNumberDown, OP_SELL))
+                  if ((Bid - PipStep * Point) >= GetLastOrderOpenPrice(magicDown, OP_SELL))
                      return (MULTIPLE);   
                }                 
             }
@@ -1362,16 +1349,16 @@ bool IsBreakEven(int type)
    switch (type)
    {
       case OP_BUY:
-         switch (GetOrdersCount(MagicNumberUp, OP_BUY))
+         switch (GetOrdersCount(magicUp, OP_BUY))
          {
             case 0: 
             case 1: 
                return (false);               
             default:
-               double lots = GetOrdersLots(MagicNumberUp);
-               double previousProfit = GetHedjeProfit(MagicNumberUp, OP_SELL, startSessionBuy);               
+               double lots = GetOrdersLots(magicUp);
+               double previousProfit = GetHedjeProfit(magicUp, OP_SELL, startSessionBuy);               
                double neededProfit = lots * ProfitPerLot;                                      
-               double currentProfit = GetOrdersProfit(MagicNumberUp); 
+               double currentProfit = GetOrdersProfit(magicUp); 
                double currentTotalProfit = currentProfit + previousProfit; 
                
                if (currentTotalProfit >= neededProfit)
@@ -1382,16 +1369,16 @@ bool IsBreakEven(int type)
          break;
          
       case OP_SELL:
-         switch (GetOrdersCount(MagicNumberDown, OP_SELL))         
+         switch (GetOrdersCount(magicDown, OP_SELL))         
          {
             case 0: 
             case 1: 
                return (false);               
             default:
-               lots = GetOrdersLots(MagicNumberDown);
-               previousProfit = GetHedjeProfit(MagicNumberDown, OP_BUY, startSessionSell);               
+               lots = GetOrdersLots(magicDown);
+               previousProfit = GetHedjeProfit(magicDown, OP_BUY, startSessionSell);               
                neededProfit = lots * ProfitPerLot;                                      
-               currentProfit = GetOrdersProfit(MagicNumberDown); 
+               currentProfit = GetOrdersProfit(magicDown); 
                currentTotalProfit = currentProfit + previousProfit;
                
                if (currentTotalProfit >= neededProfit)
