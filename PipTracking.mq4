@@ -955,15 +955,7 @@ double GetHedjeSL(int type, int hedjeStopLoss, int additionalPips)
          break;                           
    }
      
-   switch (type)
-   {
-      case OP_BUY:
-         iValue += additionalPips * Point;
-         break;
-      case OP_SELL:
-         iValue -= additionalPips * Point;
-         break;         
-   }  
+   iValue += additionalPips * Point;
    return (iValue);
 }
 //+------------------------------------------------------------------+
@@ -1468,7 +1460,6 @@ int IsOpen(int side)
                {
                   int hedjeSLMode = GetHedjeMode(UP);
                   if ((hedjeSLMode != -1) 
-                      && (Bid < GetHedjeSL(OP_SELL, hedjeSLMode, -AdditionalHedjeReenterPips))
                       && IsIndicatorsAllowHedje(UP))
                   {
                      hedjeCapturedSLUp = hedjeSLMode;
@@ -1503,14 +1494,11 @@ int IsOpen(int side)
             if (!hedjeWasClosedDown)  // First hedje
             {
                if (IsUnrealizedLoss(DOWN))
-               {
-                  Alert("(Ask < GetHedjeSL(OP_BUY, hedjeSLMode, AdditionalHedjeReenterPips) ",
-                     (Ask < GetHedjeSL(OP_BUY, hedjeSLMode, AdditionalHedjeReenterPips)));
-                  Alert("IsIndicatorsAllowHedje(DOWN) ", IsIndicatorsAllowHedje(DOWN));                     
-                  
+               {                                   
                   hedjeSLMode = GetHedjeMode(DOWN); 
-                  if ((hedjeSLMode != -1) 
-                      && (Ask < GetHedjeSL(OP_BUY, hedjeSLMode, AdditionalHedjeReenterPips))                  
+                  Alert("hedjeSLMode ", hedjeSLMode);
+                  Alert("IsIndicatorsAllowHedje(DOWN) ", IsIndicatorsAllowHedje(DOWN));                    
+                  if ((hedjeSLMode != -1)                  
                       && IsIndicatorsAllowHedje(DOWN))
                   {
                      hedjeCapturedSLDown = hedjeSLMode;
@@ -1551,12 +1539,12 @@ int GetHedjeMode(int side)
    switch (side)
    {        
       case UP:
-         double slValue = GetHedjeSL(OP_SELL, DownHedjeStopLoss, -AdditionalSLPips);         
-         if (slValue >= (Bid + stopLevel))
+         double slValue = GetHedjeSL(OP_SELL, DownHedjeStopLoss, AdditionalHedjeReenterPips);                  
+         if (slValue < (Ask + stopLevel))
          {
             for (int i = 3; i >= 1; i--)
             {
-               slValue = GetHedjeSL(OP_SELL, UpHedjeStopLoss, -AdditionalSLPips);
+               slValue = GetHedjeSL(OP_SELL, UpHedjeStopLoss, AdditionalHedjeReenterPips);
                if (slValue > (Ask + stopLevel))
                   return (i);
             }
@@ -1568,12 +1556,12 @@ int GetHedjeMode(int side)
          break;
          
       case DOWN:
-         slValue = GetHedjeSL(OP_BUY, UpHedjeStopLoss, AdditionalSLPips);
-         if (slValue <= (Ask - stopLevel))
+         slValue = GetHedjeSL(OP_BUY, UpHedjeStopLoss, -AdditionalHedjeReenterPips);
+         if ((slValue >= (Bid + stopLevel)) || ())
          {
             for (i = 1; i <= 3; i++)
             {
-               slValue = GetHedjeSL(OP_BUY, UpHedjeStopLoss, AdditionalSLPips);
+               slValue = GetHedjeSL(OP_BUY, UpHedjeStopLoss, -AdditionalHedjeReenterPips);
                if (slValue < (Bid - stopLevel))
                   return (i);
             }
