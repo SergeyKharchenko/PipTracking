@@ -1,13 +1,13 @@
 //+---------------------------- ----------------------------------------+
-//|                                                   TrendTracking.mq4 |
-//|                                        Copyright 2012, Dawud Nelson |
+//|                                                     PipTracking.mq4 |
+//|                                        Copyright 2013, Dawud Nelson |
 //|                                 Dawud Nelson <dnelson212@yahoo.com> |
 //|                                                                     |
 //|                                  Programmed by AirBionicFX Software |
 //|                                             http://airbionicfx.com/ |
 //|    Programmer Sergey Kharchenko <sergey.kharchenko@airbionicfx.com> |
 //+---------------------------------------------------------------------+
-#property copyright "Copyright 2012, Dawud Nelson"
+#property copyright "Copyright 2013, Dawud Nelson"
 
 #include <stderror.mqh>
 #include <stdlib.mqh>
@@ -787,26 +787,22 @@ string PeriodToString(int period)
 //+------------------------------------------------------------------+
 bool TryClose(int magic, int type) 
 {
-
-   int ticket = GetLastOrderTicket(magic, type);
- 
-   if (OrderSelect(ticket, SELECT_BY_TICKET) && CheckOpen(ticket) == 1)
-   {      
-      int k = 0;
-      while(k < 5)
-      {
-         RefreshRates();
-         if (OrderClose(ticket, OrderLots(), OrderClosePrice(), 100)) 
+   for (int i = OrdersTotal() - 1; i >= 0; i++)
+   {
+      if (OrderSelect(i, SELECT_BY_POS))
+      {      
+         int k = 0;
+         while(k < 5)
          {
-
-
-            return (true);
-         }   
-         k++;
-      }             
+            RefreshRates();
+            if (OrderClose(OrderTicket(), OrderLots(), OrderClosePrice(), 100)) 
+            {
+               return (true);
+            }   
+            k++;
+         }             
+      }
    }
-
-
    return (false);
 }
 //+------------------------------------------------------------------+
