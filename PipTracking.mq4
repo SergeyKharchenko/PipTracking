@@ -51,6 +51,7 @@ extern string    IndicatorPrice_Help_7 = "6 - Weighted close price";
 extern int       MAPrice           = 0;
 extern int       BBPrice           = 0;
 
+extern bool      UseOsMA     = true;
 extern int       OsMAFastEMA = 12;
 extern int       OsMASlowEMA = 9;
 extern int       OsMASMA     = 26;
@@ -64,6 +65,7 @@ extern string    OsMAPrice_Help_7 = "6 - Weighted close price, (high+low+close+c
 extern int       OsMAPrice        = 0;
 extern double    OsMAHedjeValue   = 0.001;
 
+extern bool      UseAC        = true;
 extern double    ACHedjeValue = 0.003;
 
 extern string    IndicatorSettingsTimeframe_Help = "------------------------------------------------";
@@ -138,7 +140,8 @@ int
    
 bool 
    work = true,
-   isError = false;   
+   isError = false,
+   debug = false;   
    
 double
    lot,
@@ -380,6 +383,7 @@ int init()
 	  TakeProfit *= 10;
 	  PipStep *= 10;	  
 	  AdditionalSLPips *= 10;
+	  AdditionalHedjeReenterPips *= 10;
    }
    else
    {
@@ -562,7 +566,7 @@ int start()
                         break;
 
                      case HEDJE:
-                        double slValue = GetHedjeSL(OP_SELL, hedjeCapturedSLUp, AdditionalSLPips);
+                        double slValue = GetHedjeSL(hedjeCapturedSLUp, AdditionalSLPips);
                         slOp = CastSLToPoints(slValue, OP_SELL);                     
                         ticket = OpenOrderA(Symbol(), OP_SELL, lot, Bid, slOp, 0, 100, NULL, magicUpHedje, 5, 0, Red);  
                         if (DisplayError(ticket))
@@ -585,7 +589,7 @@ int start()
          {
             TrailingHedjeByIndicatorLine(magicDownHedje, OP_BUY);
             if (IsHedjeCloseByIndicator(DOWN))
-               TryClose(magicDownHedje, OP_BUY);         
+               TryClose(magicDownHedje, OP_BUY); 
          }   
          else
          {
@@ -601,7 +605,7 @@ int start()
       {
          if (IsBreakEven(DOWN))
          {
-            stateDown = BREAK_EVEN;    
+            stateDown = BREAK_EVEN; 
             GlobalTrailing(DOWN);     
             startSessionDown = -1;      
          }      
@@ -635,11 +639,11 @@ int start()
                         break;
 
                      case HEDJE:
-                        slValue = GetHedjeSL(OP_BUY, hedjeCapturedSLDown, -AdditionalSLPips);
+                        slValue = GetHedjeSL(hedjeCapturedSLDown, -AdditionalSLPips);
                         slOp = CastSLToPoints(slValue, OP_BUY);                     
                         ticket = OpenOrderA(Symbol(), OP_BUY, lot, Ask, slOp, 0, 100, NULL, magicDownHedje, 5, 0, Lime);  
                         if (DisplayError(ticket))
-                           stateDown = NONE;
+                           stateDown = NONE; 
                         break;
                   } 
                }
@@ -696,13 +700,13 @@ void ShowStatistics()
             upSideComment = "     Live profit: " + DoubleToStr(currentProfit, 2) + " $\r\n"; 
             upSideComment = upSideComment + "     Balance of previous hedje orders: " + DoubleToStr(previousProfit, 2) + " $\r\n";                 
             upSideComment = upSideComment + "     Target break even trigger: " + DoubleToStr(GetOrdersLotsBySide(UP) * ProfitPerLot, 2) + " $\r\n";                 
-            upSideComment = upSideComment + "     Stop loss use: " + StopLossModeToString(hedjeCapturedSLUp) + "\r\n";
+            upSideComment = upSideComment + "     Stop loss uses: " + StopLossModeToString(hedjeCapturedSLUp) + "\r\n";
          
             bool isHedjeOrderExist = IsHedjeOrderExist(magicUpHedje, OP_SELL);
             if ((hedjeWasClosedUp == 1) && !isHedjeOrderExist)
             {
                upSideComment = upSideComment + "     Hedje previous price: " + DoubleToStr(GetLastHedjeOpenPrice(magicUpHedje, OP_SELL, startSessionUp), Digits) + "\r\n";                                        
-               upSideComment = upSideComment + "     Hedje indicator price: " + DoubleToStr(GetHedjeSL(OP_SELL, hedjeCapturedSLUp, -AdditionalHedjeReenterPips), Digits) + "\r\n";                            
+               upSideComment = upSideComment + "     Hedje indicator price: " + DoubleToStr(GetHedjeSL(hedjeCapturedSLUp, -AdditionalHedjeReenterPips), Digits) + "\r\n";                            
             }   
             if (isHedjeOrderExist)
                upSideComment = upSideComment + "     Hedje stop loss: " + DoubleToStr(GetLastHedjeOrderStopLoss(magicUpHedje, OP_SELL), Digits) + "\r\n";                                                                                        
@@ -737,13 +741,13 @@ void ShowStatistics()
             downSideComment = "     Live profit: " + DoubleToStr(currentProfit, 2) + " $\r\n";                       
             downSideComment = downSideComment + "     Balance of previous hedje orders: " + DoubleToStr(previousProfit, 2) + " $\r\n";                
             downSideComment = downSideComment + "     Target break even trigger: " + DoubleToStr(GetOrdersLotsBySide(DOWN) * ProfitPerLot, 2) + " $\r\n";                                     
-            downSideComment = downSideComment + "     Stop loss use: " + StopLossModeToString(hedjeCapturedSLDown) + "\r\n";
+            downSideComment = downSideComment + "     Stop loss uses: " + StopLossModeToString(hedjeCapturedSLDown) + "\r\n";
          
             isHedjeOrderExist = IsHedjeOrderExist(magicDownHedje, OP_BUY);
             if ((hedjeWasClosedDown == 1) && !isHedjeOrderExist)
             {                                       
-               downSideComment = downSideComment + "     Hedje previous price: " + DoubleToStr(GetLastHedjeOpenPrice(magicDownHedje, OP_SELL, startSessionDown), Digits) + "\r\n";
-               downSideComment = downSideComment + "     Hedje indicator price: " + DoubleToStr(GetHedjeSL(OP_BUY, hedjeCapturedSLDown, AdditionalHedjeReenterPips), Digits) + "\r\n";
+               downSideComment = downSideComment + "     Hedje previous price: " + DoubleToStr(GetLastHedjeOpenPrice(magicDownHedje, OP_BUY, startSessionDown), Digits) + "\r\n";
+               downSideComment = downSideComment + "     Hedje indicator price: " + DoubleToStr(GetHedjeSL(hedjeCapturedSLDown, AdditionalHedjeReenterPips), Digits) + "\r\n";
             }   
             if (isHedjeOrderExist)
                downSideComment = downSideComment + "     Hedje stop loss: " + DoubleToStr(GetLastHedjeOrderStopLoss(magicDownHedje, OP_BUY), Digits) + "\r\n";                  
@@ -751,9 +755,17 @@ void ShowStatistics()
                
             break;   
       }   
+      
       comment = comment + 
-           "Moving Avarage use timeframe: " + PeriodToString(MATimeframe) + "\r\n" +
-           "Bollinger Bands use timeframe: " + PeriodToString(BBTimeframe) + "\r\n" +
+           "Moving Avarage uses timeframe: " + PeriodToString(MATimeframe) + "\r\n" +
+           "Bollinger Bands uses timeframe: " + PeriodToString(BBTimeframe) + "\r\n";
+           
+      if (UseOsMA)
+         comment = comment + "OsMA uses timeframe: " + PeriodToString(OsMATimeframe) + "\r\n";
+      if (UseAC)
+         comment = comment + "AC uses timeframe: " + PeriodToString(ACTimeframe) + "\r\n";         
+           
+      comment = comment + 
            "---------------------------------------------------------\r\n" +
            "Buy\r\n" +
            "     Account balance at the session start: " + DoubleToStr(startMoneyBuy, 2) + "\r\n" +
@@ -769,13 +781,15 @@ void ShowStatistics()
    }
    
    Comment(comment); 
+   //while(debug);
 }
 //+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
 bool IsIndicatorsAllowHedje(int side)
 {
-   return (IsOsMAAllowHedje(side) && IsACAllowHedje(side));
+   return ((IsOsMAAllowHedje(side) || !UseOsMA)
+           && (IsACAllowHedje(side) || !UseAC));
 }
 //+------------------------------------------------------------------+
 
@@ -797,13 +811,13 @@ bool IsOsMAAllowHedje(int side)
 //+------------------------------------------------------------------+
 bool IsACAllowHedje(int side)
 {
-   double ao = iAC(Symbol(), ACTimeframe, 0);
+   double ac = iAC(Symbol(), ACTimeframe, 0);
    switch (side)
    {
       case UP:
-         return (ao <= -ACHedjeValue);
+         return (ac <= -ACHedjeValue);
       case DOWN:
-         return (ao >= ACHedjeValue);         
+         return (ac >= ACHedjeValue);         
    }
    return (false);
 }
@@ -934,7 +948,7 @@ int CastSLToPoints(double slValue, int type)
 //+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
-double GetHedjeSL(int type, int hedjeStopLoss, int additionalPips)
+double GetHedjeSL(int hedjeStopLoss, int additionalPips)
 {
    double iValue;
    switch (hedjeStopLoss)
@@ -1019,19 +1033,19 @@ void TrailingHedjeByIndicatorLine(int magic, int type, int attempts = 5)
                
                if (OrderType() == OP_BUY)
                {
-                  double slValue = GetHedjeSL(OP_BUY, hedjeCapturedSLDown, AdditionalSLPips);                                    
+                  double slValue = GetHedjeSL( hedjeCapturedSLDown, -AdditionalSLPips);                                    
                   int newSLpt = CastSLToPoints(slValue, OP_BUY);                                  
                   int checkedSLpt = CheckStop(newSLpt, 0);          
                   double newSL = NormalizeDouble(Ask - checkedSLpt * Point, Digits);                             
                   if (NormalizeDouble(newSL, Digits) != NormalizeDouble(OrderStopLoss(), Digits))
                   {
-                     OrderModify(OrderTicket(), OrderOpenPrice(), newSL, OrderTakeProfit(), OrderExpiration(), Lime);
+                     OrderModify(OrderTicket(), OrderOpenPrice(), newSL, OrderTakeProfit(), OrderExpiration(), Lime);                     
                   }
                }
 
                if (OrderType() == OP_SELL)
                {                  
-                  slValue = GetHedjeSL(OP_SELL, hedjeCapturedSLUp, -AdditionalSLPips);
+                  slValue = GetHedjeSL(hedjeCapturedSLUp, AdditionalSLPips);
                   newSLpt = CastSLToPoints(slValue, OP_SELL);
                   checkedSLpt = CheckStop(newSLpt, 0);                  
                   newSL = NormalizeDouble(Bid + checkedSLpt * Point, Digits);
@@ -1138,16 +1152,17 @@ double CalculateLotByState(int type, int state)
 //+------------------------------------------------------------------+
 bool IsHedjeCloseByIndicator(int type)
 {
+   return (false);
    switch (type)
    {
       case UP:
-         double hedjeSL = GetHedjeSL(OP_SELL, hedjeCapturedSLUp, false);
+         double hedjeSL = GetHedjeSL(hedjeCapturedSLUp, false);
          if (hedjeSL <= Ask)
             return (true);         
          break;
             
       case DOWN:
-         hedjeSL = GetHedjeSL(OP_BUY, hedjeCapturedSLDown, false);
+         hedjeSL = GetHedjeSL(hedjeCapturedSLDown, false);
          if (hedjeSL >= Bid)
             return (true);
          break;        
@@ -1478,7 +1493,7 @@ int IsOpen(int side)
             {
                double lastHedjeOpenPrice = GetLastHedjeOpenPrice(magicUpHedje, OP_SELL, startSessionUp);
                if ((Bid < lastHedjeOpenPrice)
-                   && (Bid < GetHedjeSL(OP_SELL, hedjeCapturedSLUp, -AdditionalHedjeReenterPips))
+                   && (Bid < GetHedjeSL(hedjeCapturedSLUp, -AdditionalHedjeReenterPips))
                    && IsIndicatorsAllowHedje(UP))
                   return (HEDJE);
             }
@@ -1495,9 +1510,7 @@ int IsOpen(int side)
             {
                if (IsUnrealizedLoss(DOWN))
                {                                   
-                  hedjeSLMode = GetHedjeMode(DOWN); 
-                  Alert("hedjeSLMode ", hedjeSLMode);
-                  Alert("IsIndicatorsAllowHedje(DOWN) ", IsIndicatorsAllowHedje(DOWN));                    
+                  hedjeSLMode = GetHedjeMode(DOWN);                   
                   if ((hedjeSLMode != -1)                  
                       && IsIndicatorsAllowHedje(DOWN))
                   {
@@ -1514,12 +1527,12 @@ int IsOpen(int side)
                }                 
             }
             else  // Not first hedje
-            {
+            {                            
                lastHedjeOpenPrice = GetLastHedjeOpenPrice(magicDownHedje, OP_BUY, startSessionUp);
-               if ((Ask < lastHedjeOpenPrice)
-                   && (Ask < GetHedjeSL(OP_BUY, hedjeCapturedSLDown, AdditionalHedjeReenterPips))
+               if ((Ask > lastHedjeOpenPrice)
+                   && (Ask > GetHedjeSL(hedjeCapturedSLDown, AdditionalHedjeReenterPips))
                    && IsIndicatorsAllowHedje(DOWN))
-                  return (HEDJE);
+                     return (HEDJE);
             }
          }
          break;         
@@ -1539,12 +1552,12 @@ int GetHedjeMode(int side)
    switch (side)
    {        
       case UP:
-         double slValue = GetHedjeSL(OP_SELL, DownHedjeStopLoss, AdditionalHedjeReenterPips);                  
+         double slValue = GetHedjeSL(DownHedjeStopLoss, AdditionalHedjeReenterPips);                  
          if (slValue < (Ask + stopLevel))
          {
             for (int i = 3; i >= 1; i--)
             {
-               slValue = GetHedjeSL(OP_SELL, UpHedjeStopLoss, AdditionalHedjeReenterPips);
+               slValue = GetHedjeSL(UpHedjeStopLoss, AdditionalHedjeReenterPips);
                if (slValue > (Ask + stopLevel))
                   return (i);
             }
@@ -1556,12 +1569,12 @@ int GetHedjeMode(int side)
          break;
          
       case DOWN:
-         slValue = GetHedjeSL(OP_BUY, UpHedjeStopLoss, -AdditionalHedjeReenterPips);
+         slValue = GetHedjeSL(UpHedjeStopLoss, -AdditionalHedjeReenterPips);
          if ((slValue >= (Bid + stopLevel)) || ())
          {
             for (i = 1; i <= 3; i++)
             {
-               slValue = GetHedjeSL(OP_BUY, UpHedjeStopLoss, -AdditionalHedjeReenterPips);
+               slValue = GetHedjeSL(UpHedjeStopLoss, -AdditionalHedjeReenterPips);
                if (slValue < (Bid - stopLevel))
                   return (i);
             }
