@@ -141,7 +141,8 @@ int
 bool 
    work = true,
    isError = false,
-   debug = false;   
+   debug = false,
+   preDebug = false;   
    
 double
    lot,
@@ -516,8 +517,6 @@ int start()
          if (GetOrdersCount(magicUpHedje, OP_SELL) > 0)
          {
             TrailingHedjeByIndicatorLine(magicUpHedje, OP_SELL); 
-            if (IsHedjeCloseByIndicator(UP))
-               TryClose(magicUpHedje, OP_SELL);
          }   
          else
          {
@@ -587,9 +586,7 @@ int start()
       {
          if (GetOrdersCount(magicDownHedje, OP_BUY) > 0)
          {
-            TrailingHedjeByIndicatorLine(magicDownHedje, OP_BUY);
-            if (IsHedjeCloseByIndicator(DOWN))
-               TryClose(magicDownHedje, OP_BUY); 
+            TrailingHedjeByIndicatorLine(magicDownHedje, OP_BUY); 
          }   
          else
          {
@@ -861,7 +858,7 @@ bool IsTakeProfitForSimpleState(int side)
          {
             case 0: return (false);
             case 1: 
-               if (Ask >= (GetLastOrderOpenPrice(magicUpSimple, OP_BUY) + TakeProfit * Point))
+               if (Bid >= (GetLastOrderOpenPrice(magicUpSimple, OP_BUY) + TakeProfit * Point))
                   return (true);
                break;
          }
@@ -872,7 +869,7 @@ bool IsTakeProfitForSimpleState(int side)
          {
             case 0: return (false);
             case 1: 
-               if (Bid <= (GetLastOrderOpenPrice(magicDownSimple, OP_SELL) - TakeProfit * Point))
+               if (Ask <= (GetLastOrderOpenPrice(magicDownSimple, OP_SELL) - TakeProfit * Point))
                   return (true);
                break;               
          }
@@ -905,10 +902,13 @@ string PeriodToString(int period)
 //+------------------------------------------------------------------+
 bool TryClose(int magic, int type) 
 {
-   for (int i = OrdersTotal() - 1; i >= 0; i++)
+   for (int i = OrdersTotal() - 1; i >= 0; i--)
    {
       if (OrderSelect(i, SELECT_BY_POS))
       {      
+         if (OrderMagicNumber() != magic)
+            continue;
+            
          int k = 0;
          while(k < 5)
          {
@@ -1149,28 +1149,6 @@ double CalculateLotByState(int type, int state)
 }
 //+------------------------------------------------------------------+
 
-//+------------------------------------------------------------------+
-bool IsHedjeCloseByIndicator(int type)
-{
-   return (false);
-   switch (type)
-   {
-      case UP:
-         double hedjeSL = GetHedjeSL(hedjeCapturedSLUp, false);
-         if (hedjeSL <= Ask)
-            return (true);         
-         break;
-            
-      case DOWN:
-         hedjeSL = GetHedjeSL(hedjeCapturedSLDown, false);
-         if (hedjeSL >= Bid)
-            return (true);
-         break;        
-   }   
-   return (false);
-}
-
-//+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
 int GetOrdersCountBySide(int side)
