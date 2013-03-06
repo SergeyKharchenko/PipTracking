@@ -16,7 +16,6 @@
 //--- input parameters
 extern string    OrderSettings     = "------------------------------------------------";
 extern bool      OpenTrades        = true;
-extern int       StopLoss          = 0;
 
 extern string    HedjeStopLoss_Help_1 = "0 - Moving Average";
 extern string    HedjeStopLoss_Help_2 = "1 - Bollinger Bands Lowest";
@@ -63,10 +62,10 @@ extern string    OsMAPrice_Help_5 = "4 - Median price, (high+low)/2";
 extern string    OsMAPrice_Help_6 = "5 - Typical price, (high+low+close)/3";
 extern string    OsMAPrice_Help_7 = "6 - Weighted close price, (high+low+close+close)/4";
 extern int       OsMAPrice        = 0;
-extern double    OsMAHedjeValue   = 0.001;
+extern double    OsMAHedjeValue   = 0.0001;
 
 extern bool      UseAC        = true;
-extern double    ACHedjeValue = 0.003;
+extern double    ACHedjeValue = 0.0001;
 
 extern string    IndicatorSettingsTimeframe_Help = "------------------------------------------------";
 extern string    IndicatorTimeframe_Help_1  = "0 - Timeframe used on the chart";
@@ -173,15 +172,7 @@ int init()
          Alert("MagicNumber is invalid");
       work = false;
       return; 
-   }                   
-   
-   if (StopLoss < 0) {
-      if (ShowAlerts) {
-         Alert("StopLoss is invalid");
-      }   
-      work = false;
-      return; 
-   }  
+   }      
    
    if (TakeProfit < 0) {
       if (ShowAlerts) {
@@ -389,15 +380,10 @@ int init()
       
    if ((Digits == 5) || (Digits == 3))
    {
-	  sl = CheckStop(StopLoss * 10, 0); 
 	  TakeProfit *= 10;
 	  PipStep *= 10;	  
 	  AdditionalSLPips *= 10;
 	  AdditionalHedjeReenterPips *= 10;
-   }
-   else
-   {
-	  sl = CheckStop(StopLoss, 0);
    }
    
    isError = false;
@@ -794,13 +780,13 @@ void ShowStatistics()
            
       comment = comment + 
            "---------------------------------------------------------\r\n" +
-           "Buy\r\n" +
+           "Up side\r\n" +
            "     Account balance at the session start: " + DoubleToStr(startMoneyUp, 2) + "\r\n" +
            "     Lots: " + DoubleToStr(GetOrdersLotsBySide(UP), 2) + "\r\n" +
            "     Current total profit: " + DoubleToStr(currentTotalProfitUp, 2) + " $\r\n" +
            upSideComment +
            "=========================\r\n" +
-           "Sell\r\n" +
+           "Down side\r\n" +
            "     Account balance at the session start: " + DoubleToStr(startMoneyDown, 2) + "\r\n" +
            "     Lots: " + DoubleToStr(GetOrdersLotsBySide(DOWN), 2) + "\r\n" +
            "     Current total profit: " + DoubleToStr(currentTotalProfitDown, 2) + " $\r\n" +              
@@ -1519,9 +1505,10 @@ int IsOpen(int side)
                }     
                else
                {   
-                  double lastOrderOpenPrice = MathMin(GetLastOrderOpenPrice(magicUpSimple, OP_BUY),
-                                                      GetLastOrderOpenPrice(magicUpMultiple, OP_BUY));
-                  if ((Ask + PipStep * Point) <= lastOrderOpenPrice)
+                  double lastOrderOpenPrice = MathMinBlocked(GetLastOrderOpenPrice(magicUpSimple, OP_BUY),
+                                                             GetLastOrderOpenPrice(magicUpMultiple, OP_BUY), -1);                                                        
+                                                      
+                  if (((Ask + PipStep * Point) <= lastOrderOpenPrice) && (lastOrderOpenPrice != -1))
                      return (MULTIPLE);      
                }                 
             }
@@ -1578,6 +1565,20 @@ int IsOpen(int side)
    return (-1);
 }
 //+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+double MathMinBlocked(double x, double y, double blocked)
+{
+   double value = MathMin(x, y);
+   if (value != blocked)
+      return (value);
+   if (x != blocked)   
+      return (x);
+   if (y != blocked)   
+      return (y);
+   return (blocked);   
+}
+//+------------------------------------------------------------------+         
 
 //+------------------------------------------------------------------+
 int GetHedjeMode(int side)
