@@ -16,7 +16,6 @@
 //--- input parameters
 extern string    OrderSettings     = "------------------------------------------------";
 extern bool      OpenTrades        = true;
-extern int       StopLoss          = 0;
 
 extern string    HedjeStopLoss_Help_1 = "0 - Moving Average";
 extern string    HedjeStopLoss_Help_2 = "1 - Bollinger Bands Lowest";
@@ -63,10 +62,10 @@ extern string    OsMAPrice_Help_5 = "4 - Median price, (high+low)/2";
 extern string    OsMAPrice_Help_6 = "5 - Typical price, (high+low+close)/3";
 extern string    OsMAPrice_Help_7 = "6 - Weighted close price, (high+low+close+close)/4";
 extern int       OsMAPrice        = 0;
-extern double    OsMAHedjeValue   = 0.001;
+extern double    OsMAHedjeValue   = 0.0001;
 
 extern bool      UseAC        = true;
-extern double    ACHedjeValue = 0.003;
+extern double    ACHedjeValue = 0.0001;
 
 extern string    IndicatorSettingsTimeframe_Help = "------------------------------------------------";
 extern string    IndicatorTimeframe_Help_1  = "0 - Timeframe used on the chart";
@@ -96,6 +95,7 @@ extern double    LotHedjeExponent    = 2.5;
 extern string    StrategySettings  = "------------------------------------------------";
 extern int       PipStep           = 25;
 extern double    UnrealizedLoss    = 15;
+extern double    CriticalLoss      = 50;
 
 extern string    MagicNymberSettings = "------------------------------------------------";
 extern string    MagicNumber_Help    = "Should be unique for all charts";
@@ -147,8 +147,8 @@ bool
 double
    lot,
    startLot,
-   startMoneyBuy,
-   startMoneySell;   
+   startMoneyUp,
+   startMoneyDown;   
    
 string 
    errorStr,
@@ -172,15 +172,7 @@ int init()
          Alert("MagicNumber is invalid");
       work = false;
       return; 
-   }                   
-   
-   if (StopLoss < 0) {
-      if (ShowAlerts) {
-         Alert("StopLoss is invalid");
-      }   
-      work = false;
-      return; 
-   }  
+   }      
    
    if (TakeProfit < 0) {
       if (ShowAlerts) {
@@ -358,6 +350,13 @@ int init()
       return; 
    }  
    
+   if (CriticalLoss <= 0) {
+      if (ShowAlerts) {
+         Alert("CriticalLoss is invalid");
+      }   
+      work = false;
+      return; 
+   }    
    
    lot = NormalizeLots(LotSize, Symbol());
 
@@ -369,6 +368,7 @@ int init()
       return; 
    }
    
+      
    startLot = lot;
    
    if (MarketInfo(Symbol(), MODE_LOTSIZE) != 0)
@@ -380,15 +380,10 @@ int init()
       
    if ((Digits == 5) || (Digits == 3))
    {
-	  sl = CheckStop(StopLoss * 10, 0); 
 	  TakeProfit *= 10;
 	  PipStep *= 10;	  
 	  AdditionalSLPips *= 10;
 	  AdditionalHedjeReenterPips *= 10;
-   }
-   else
-   {
-	  sl = CheckStop(StopLoss, 0);
    }
    
    isError = false;
@@ -396,8 +391,8 @@ int init()
    stateUp  = NONE;
    stateDown = NONE;
    
-   startMoneyBuy = -1;
-   startMoneySell = -1;
+   startMoneyUp = -1;
+   startMoneyDown = -1;
    startSessionUp = -1;
    startSessionDown = -1;       
    hedjeWasClosedUp = 0;
@@ -443,13 +438,13 @@ void LoadSession()
    if(handle > 0)
    {
       stateUp = FileReadNumber(handle);
-      startMoneyBuy = FileReadNumber(handle);
+      startMoneyUp = FileReadNumber(handle);
       startSessionUp = FileReadNumber(handle);
       hedjeWasClosedUp = FileReadNumber(handle);   
       hedjeCapturedSLUp = FileReadNumber(handle); 
       
       stateDown = FileReadNumber(handle);
-      startMoneySell = FileReadNumber(handle);
+      startMoneyDown = FileReadNumber(handle);
       startSessionUp = FileReadNumber(handle);
       hedjeWasClosedDown = FileReadNumber(handle); 
       hedjeCapturedSLDown = FileReadNumber(handle); 
@@ -464,8 +459,8 @@ void SaveSession()
    if(handle > 0)
    {
       FileWrite(handle, 
-               stateUp, startMoneyBuy, startSessionUp, hedjeWasClosedUp, hedjeCapturedSLUp,
-               stateDown, startMoneySell, startSessionDown, hedjeWasClosedDown, hedjeCapturedSLDown);
+               stateUp, startMoneyUp, startSessionUp, hedjeWasClosedUp, hedjeCapturedSLUp,
+               stateDown, startMoneyDown, startSessionDown, hedjeWasClosedDown, hedjeCapturedSLDown);
       FileClose(handle);
    }
 }
@@ -487,7 +482,7 @@ int start()
    {
       Comment("Reload EA with correct parameters.");
       return;
-   }   
+   }     
  
    if (isError)
    {
@@ -495,8 +490,8 @@ int start()
       
       stateUp  = NONE;
       stateDown = NONE;   
-      startMoneyBuy = -1;
-      startMoneySell = -1;
+      startMoneyUp = -1;
+      startMoneyDown = -1;
       startSessionUp = -1;
       startSessionDown = -1;       
       hedjeWasClosedUp = 0;
@@ -506,6 +501,22 @@ int start()
    }   
    else
    {
+      if (IsCriticalLoss(UP))
+      {
+         Alert("You have reached critical loss by Buy side");
+         isError = true;
+         start();
+         return;
+      }
+      
+      if (IsCriticalLoss(DOWN))
+      {
+         Alert("You have reached critical loss by Sell side");
+         isError = true;
+         start();
+         return;
+      }      
+   
       SaveSession();
       
       // --> Buy    
@@ -550,7 +561,7 @@ int start()
                   switch (stateUp)
                   {              
                      case SIMPLE: 
-                        startMoneyBuy = AccountBalance();  
+                        startMoneyUp = AccountBalance();  
                         startSessionUp = TimeCurrent();
                         hedjeWasClosedUp = 0;
                         ticket = OpenOrderA(Symbol(), OP_BUY, startLot, Ask, sl, 0, 100, NULL, magicUpSimple, 5, 0, Lime);  
@@ -621,7 +632,7 @@ int start()
                   switch (stateDown)
                   {              
                      case SIMPLE: 
-                        startMoneySell = AccountBalance();  
+                        startMoneyDown = AccountBalance();  
                         startSessionDown = TimeCurrent();
                         hedjeWasClosedDown = 0;
                         ticket = OpenOrderA(Symbol(), OP_SELL, startLot, Bid, sl, 0, 100, NULL, magicDownSimple, 5, 0, Red);  
@@ -667,14 +678,14 @@ void ShowStatistics()
    }
    else
    {
-      double currentTotalProfitUp;
-      
       string upSideComment;
+   
+      double currentTotalProfitUp;            
       switch (stateUp)
       {
          case SIMPLE:
             upSideComment = "     Target take profit: " + DoubleToStr(GetLastOrderOpenPrice(magicUpSimple, OP_BUY) + TakeProfit * Point, Digits) + "\r\n";
-            double targetUnresizedLoss = startMoneyBuy - GetUnrealizedLoss(UP);
+            double targetUnresizedLoss = startMoneyUp - GetTargetLossByPercent(UP, UnrealizedLoss);
             upSideComment = upSideComment + "     Target unrealized loss: " + DoubleToStr(targetUnresizedLoss, 2) + "\r\n";
             currentTotalProfitUp = GetOrdersProfitBySide(UP);
             break;
@@ -685,7 +696,7 @@ void ShowStatistics()
          case MULTIPLE:
             currentTotalProfitUp = GetOrdersProfitBySide(UP);                                            
             upSideComment = "     Target break even trigger: " + DoubleToStr(GetOrdersLotsBySide(UP) * ProfitPerLot, 2) + " $\r\n";
-            targetUnresizedLoss = startMoneyBuy - GetUnrealizedLoss(UP);
+            targetUnresizedLoss = startMoneyUp - GetTargetLossByPercent(UP, UnrealizedLoss);
             upSideComment = upSideComment + "     Target unrealized loss: " + DoubleToStr(targetUnresizedLoss, 2) + "\r\n";                                         
             break;   
             
@@ -709,14 +720,18 @@ void ShowStatistics()
                upSideComment = upSideComment + "     Hedje stop loss: " + DoubleToStr(GetLastHedjeOrderStopLoss(magicUpHedje, OP_SELL), Digits) + "\r\n";                                                                                        
             break;   
       }
+      double targetCriticalLoss = startMoneyUp - GetTargetLossByPercent(UP, CriticalLoss);
+      upSideComment = upSideComment + "     Target critical loss: " + DoubleToStr(targetCriticalLoss, 2) + "\r\n";        
 
-      double currentTotalProfitDown;
+
       string downSideComment;
+      
+      double currentTotalProfitDown;      
       switch (stateDown)
       {
          case SIMPLE:
             downSideComment = "     Target take profit: " + DoubleToStr(GetLastOrderOpenPrice(magicDownSimple, OP_SELL) - TakeProfit * Point, Digits) + "\r\n";
-            targetUnresizedLoss = startMoneySell - GetUnrealizedLoss(DOWN);
+            targetUnresizedLoss = startMoneyDown - GetTargetLossByPercent(DOWN, UnrealizedLoss);
             downSideComment = downSideComment + "     Target unrealized loss: " + DoubleToStr(targetUnresizedLoss, 2) + "\r\n";               
             currentTotalProfitDown = GetOrdersProfitBySide(DOWN);
             break;
@@ -727,7 +742,7 @@ void ShowStatistics()
          case MULTIPLE:
             currentTotalProfitDown = GetOrdersProfitBySide(DOWN);
             downSideComment = "     Target break even trigger: " + DoubleToStr(GetOrdersLotsBySide(DOWN) * ProfitPerLot, 2) + " $\r\n";
-            targetUnresizedLoss = startMoneySell - GetUnrealizedLoss(DOWN);
+            targetUnresizedLoss = startMoneyDown - GetTargetLossByPercent(DOWN, UnrealizedLoss);
             downSideComment = downSideComment + "     Target unrealized loss: " + DoubleToStr(targetUnresizedLoss, 2) + "\r\n";                  
             break;                 
          case HEDJE:           
@@ -747,11 +762,12 @@ void ShowStatistics()
                downSideComment = downSideComment + "     Hedje indicator price: " + DoubleToStr(GetHedjeSL(hedjeCapturedSLDown, AdditionalHedjeReenterPips), Digits) + "\r\n";
             }   
             if (isHedjeOrderExist)
-               downSideComment = downSideComment + "     Hedje stop loss: " + DoubleToStr(GetLastHedjeOrderStopLoss(magicDownHedje, OP_BUY), Digits) + "\r\n";                  
-         
-               
+               downSideComment = downSideComment + "     Hedje stop loss: " + DoubleToStr(GetLastHedjeOrderStopLoss(magicDownHedje, OP_BUY), Digits) + "\r\n";                     
             break;   
       }   
+      
+      targetCriticalLoss = startMoneyDown - GetTargetLossByPercent(DOWN, CriticalLoss);
+      downSideComment = downSideComment + "     Target critical loss: " + DoubleToStr(targetCriticalLoss, 2) + "\r\n";        
       
       comment = comment + 
            "Moving Avarage uses timeframe: " + PeriodToString(MATimeframe) + "\r\n" +
@@ -764,14 +780,14 @@ void ShowStatistics()
            
       comment = comment + 
            "---------------------------------------------------------\r\n" +
-           "Buy\r\n" +
-           "     Account balance at the session start: " + DoubleToStr(startMoneyBuy, 2) + "\r\n" +
+           "Up side\r\n" +
+           "     Account balance at the session start: " + DoubleToStr(startMoneyUp, 2) + "\r\n" +
            "     Lots: " + DoubleToStr(GetOrdersLotsBySide(UP), 2) + "\r\n" +
            "     Current total profit: " + DoubleToStr(currentTotalProfitUp, 2) + " $\r\n" +
            upSideComment +
            "=========================\r\n" +
-           "Sell\r\n" +
-           "     Account balance at the session start: " + DoubleToStr(startMoneySell, 2) + "\r\n" +
+           "Down side\r\n" +
+           "     Account balance at the session start: " + DoubleToStr(startMoneyDown, 2) + "\r\n" +
            "     Lots: " + DoubleToStr(GetOrdersLotsBySide(DOWN), 2) + "\r\n" +
            "     Current total profit: " + DoubleToStr(currentTotalProfitDown, 2) + " $\r\n" +              
            downSideComment;
@@ -1308,7 +1324,7 @@ double GetOrdersProfitBySide(int side)
 //+------------------------------------------------------------------+
 bool IsUnrealizedLoss(int side)
 {
-   double loss = GetUnrealizedLoss(side);
+   double loss = GetTargetLossByPercent(side, UnrealizedLoss);
    loss *= -1;
    if (GetOrdersProfitBySide(side) <= loss)
       return (true);
@@ -1318,23 +1334,51 @@ bool IsUnrealizedLoss(int side)
 //+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
-double GetUnrealizedLoss(int side)
+bool IsCriticalLoss(int side)
+{
+   double loss = GetTargetLossByPercent(side, CriticalLoss);
+   loss *= -1;
+   
+   double totalProfit = 0;
+   switch (side)
+   {
+      case UP:
+         totalProfit += GetHedjeProfitFromHistory(magicUpHedje, OP_SELL, startSessionUp);
+         break;
+      case DOWN:
+         totalProfit += GetHedjeProfitFromHistory(magicDownHedje, OP_BUY, startSessionDown);
+         break;  
+   }
+   totalProfit += GetOrdersProfitBySide(side);
+   
+   if ((MathAbs(totalProfit) < Point) || (MathAbs(loss) < Point))
+      return (false);
+   
+   if (totalProfit <= loss)
+      return (true);
+      
+   return (false);
+}
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+double GetTargetLossByPercent(int side, double percent)
 {
    double loss = 0; 
    switch (side)
    {
       case UP:
-         if (startMoneyBuy == -1)
+         if (startMoneyUp == -1)
             loss = 0;     
          else
-            loss = startMoneyBuy * (UnrealizedLoss / 100);
+            loss = startMoneyUp * (percent / 100);
          break;
          
       case DOWN:
-         if (startMoneySell == -1)
+         if (startMoneyDown == -1)
             loss = 0;
          else
-            loss = startMoneySell * (UnrealizedLoss / 100);         
+            loss = startMoneyDown * (percent / 100);         
          break;
    }   
    return (loss);
@@ -1461,9 +1505,10 @@ int IsOpen(int side)
                }     
                else
                {   
-                  double lastOrderOpenPrice = MathMin(GetLastOrderOpenPrice(magicUpSimple, OP_BUY),
-                                                      GetLastOrderOpenPrice(magicUpMultiple, OP_BUY));
-                  if ((Ask + PipStep * Point) <= lastOrderOpenPrice)
+                  double lastOrderOpenPrice = MathMinBlocked(GetLastOrderOpenPrice(magicUpSimple, OP_BUY),
+                                                             GetLastOrderOpenPrice(magicUpMultiple, OP_BUY), -1);                                                        
+                                                      
+                  if (((Ask + PipStep * Point) <= lastOrderOpenPrice) && (lastOrderOpenPrice != -1))
                      return (MULTIPLE);      
                }                 
             }
@@ -1520,6 +1565,20 @@ int IsOpen(int side)
    return (-1);
 }
 //+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+double MathMinBlocked(double x, double y, double blocked)
+{
+   double value = MathMin(x, y);
+   if (value != blocked)
+      return (value);
+   if (x != blocked)   
+      return (x);
+   if (y != blocked)   
+      return (y);
+   return (blocked);   
+}
+//+------------------------------------------------------------------+         
 
 //+------------------------------------------------------------------+
 int GetHedjeMode(int side)
