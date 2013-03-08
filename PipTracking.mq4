@@ -86,7 +86,8 @@ extern int       ACTimeframe  = 0;
 
 extern int       TakeProfit         = 20;
 extern double    ProfitPerLot       = 30;
-extern int       BalancePips        = 60;
+extern int       InitialBalancePips      = 60;
+extern int       HedgeBalancePips    = 60;
 extern bool      UpBalanceUse       = true;
 extern bool      DownBalanceUse     = true;
 
@@ -180,7 +181,8 @@ int init()
 	  PipStep *= 10;	  
 	  AdditionalSLPips *= 10;
 	  AdditionalHedgeReenterPips *= 10;
-	  BalancePips *= 10;
+	  InitialBalancePips *= 10;
+	  HedgeBalancePips *= 10;
    }
 
    if (MagicNumber <= 0) 
@@ -375,13 +377,21 @@ int init()
       return; 
    }    
    
-   if ((BalancePips * Point) < (Ask - Bid)) {
+   if ((InitialBalancePips * Point) < (Ask - Bid)) {
       if (ShowAlerts) {
-         Alert("BalancePips should be morethan spread");
+         Alert("InitialBalancePips should be more than spread");
       }   
       work = false;
       return; 
-   }      
+   }    
+   
+   if ((HedgeBalancePips * Point) < (Ask - Bid)) {
+      if (ShowAlerts) {
+         Alert("HedgeBalancePips should be more than spread");
+      }   
+      work = false;
+      return; 
+   }     
    
    lot = NormalizeLots(LotSize, Symbol());
 
@@ -757,7 +767,7 @@ void ShowStatistics()
          case BALANCE_SELL:    
          case BALANCE_BUY: 
             double currentProfit = GetOrdersProfitBySide(UP); 
-            double previousProfit = GetHedgeProfitFromHistory(magicUpHedge, OP_SELL, startSessionUp);                 
+            double previousProfit = GetHedgeProfitFromHistory(UP, startSessionUp);                 
             currentTotalProfitUp = currentProfit + previousProfit;
                                        
             upSideComment = "     Live profit: " + DoubleToStr(currentProfit, 2) + " $\n"; 
@@ -773,6 +783,14 @@ void ShowStatistics()
             }   
             if (isHedgeOrderExist)
                upSideComment = upSideComment + "     Hedge stop loss: " + DoubleToStr(GetLastHedgeOrderStopLoss(magicUpHedge, OP_SELL), Digits) + "\n";                                                                                        
+               
+            double lotsBalance = -1;   
+            if (stateUp == BALANCE_SELL) 
+               lotsBalance = GetLastOrderLots(magicUpBalance, OP_SELL);
+            if (stateUp == BALANCE_BUY)   
+               lotsBalance = GetLastOrderLots(magicUpBalance, OP_BUY);
+            if (lotsBalance != -1)
+               upSideComment = upSideComment + "     Balance lots: " + DoubleToStr(lotsBalance, 2) + "\n";
             break;   
       }
       double targetCriticalLoss = startMoneyUp - GetTargetLossByPercent(UP, CriticalLoss);
@@ -804,7 +822,7 @@ void ShowStatistics()
          case BALANCE_BUY:  
          case BALANCE_SELL: 
             currentProfit = GetOrdersProfitBySide(DOWN);              
-            previousProfit = GetHedgeProfitFromHistory(magicDownHedge, OP_BUY, startSessionDown);               
+            previousProfit = GetHedgeProfitFromHistory(DOWN, startSessionDown);               
             currentTotalProfitDown = currentProfit + previousProfit;                                                          
                                   
             downSideComment = "     Live profit: " + DoubleToStr(currentProfit, 2) + " $\n";                       
@@ -820,6 +838,14 @@ void ShowStatistics()
             }   
             if (isHedgeOrderExist)
                downSideComment = downSideComment + "     Hedge stop loss: " + DoubleToStr(GetLastHedgeOrderStopLoss(magicDownHedge, OP_BUY), Digits) + "\n";                     
+               
+            lotsBalance = -1;   
+            if (stateDown == BALANCE_BUY)   
+               lotsBalance = GetLastOrderLots(magicDownBalance, OP_BUY);            
+            if (stateDown == BALANCE_SELL) 
+               lotsBalance = GetLastOrderLots(magicDownBalance, OP_SELL);
+            if (lotsBalance != -1)
+               downSideComment = downSideComment + "     Balance lots: " + DoubleToStr(lotsBalance, 2) + "\n";               
             break;   
       }   
       
@@ -1048,16 +1074,32 @@ double GetHedgeSL(int hedgeStopLoss, int additionalPips)
 //+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
-double GetHedgeProfitFromHistory(int magic, int type, datetime time)
+double GetHedgeProfitFromHistory(int side, datetime time)
 {
-   double profit = 0;
+   double profit = 0;      
+   
    for (int i = OrdersHistoryTotal() - 1; i >= 0; i--)  
    {
       if (OrderSelect(i, SELECT_BY_POS, MODE_HISTORY))
       {
          if (OrderSymbol() != Symbol()) continue;
-         if (OrderMagicNumber() != magic) continue;                           
-         if (OrderType() != type) continue;
+         switch (side)  
+         {
+            case UP:
+               if ((OrderMagicNumber() != magicUpHedge)
+                   && (OrderMagicNumber() != magicUpBalance))
+                  continue;
+               if (OrderType() != OP_SELL)   
+                  continue;
+               break;
+            case DOWN:
+               if ((OrderMagicNumber() != magicDownHedge)
+                   && (OrderMagicNumber() != magicDownBalance))
+                  continue;
+               if (OrderType() != OP_BUY)   
+                  continue;
+               break;               
+         }
          if ((OrderOpenTime() < time) || (time == -1)) continue;
          profit = profit + OrderProfit();
       }
@@ -1209,13 +1251,13 @@ double CalculateLotByState(int side, int state)
             case HEDGE:
                return (NormalizeLots(GetOrdersLotsBySide(UP) * LotHedgeExponent, Symbol()));  
             case BALANCE_SELL:
-               double lots = GetBalanceLotsAmount(side, OP_SELL, Ask - BalancePips*Point, ProfitPerLot);
+               double lots = GetBalanceLotsAmount(side, OP_SELL, Ask - HedgeBalancePips*Point, ProfitPerLot);
                if (lots < 0) return (-1);
                return (NormalizeLots(lots, Symbol()));    
             case BALANCE_BUY:
-               lots = GetBalanceLotsAmount(side, OP_BUY, Bid + BalancePips*Point, ProfitPerLot);
+               lots = GetBalanceLotsAmount(side, OP_BUY, Bid + InitialBalancePips*Point, ProfitPerLot);
                if (lots < 0) return (-1);
-               return (NormalizeLots(GetBalanceLotsAmount(side, OP_BUY, Bid + BalancePips*Point, ProfitPerLot), Symbol()));                                                  
+               return (NormalizeLots(lots, Symbol()));                                                  
          }
       case DOWN:
          switch (state)
@@ -1227,11 +1269,11 @@ double CalculateLotByState(int side, int state)
             case HEDGE:
                return (NormalizeLots(GetOrdersLotsBySide(DOWN) * LotHedgeExponent, Symbol()));
             case BALANCE_BUY:
-               lots = GetBalanceLotsAmount(side, OP_BUY, Bid + BalancePips*Point, ProfitPerLot);
+               lots = GetBalanceLotsAmount(side, OP_BUY, Bid + HedgeBalancePips*Point, ProfitPerLot);
                if (lots < 0) return (-1);
                return (NormalizeLots(lots, Symbol())); 
             case BALANCE_SELL:
-               lots = GetBalanceLotsAmount(side, OP_SELL, Ask - BalancePips*Point, ProfitPerLot);    
+               lots = GetBalanceLotsAmount(side, OP_SELL, Ask - InitialBalancePips*Point, ProfitPerLot);    
                if (lots < 0) return (-1);        
                return (NormalizeLots(lots, Symbol()));                                               
          }
@@ -1520,10 +1562,10 @@ bool IsCriticalLoss(int side)
    switch (side)
    {
       case UP:
-         totalProfit += GetHedgeProfitFromHistory(magicUpHedge, OP_SELL, startSessionUp);
+         totalProfit += GetHedgeProfitFromHistory(UP, startSessionUp);
          break;
       case DOWN:
-         totalProfit += GetHedgeProfitFromHistory(magicDownHedge, OP_BUY, startSessionDown);
+         totalProfit += GetHedgeProfitFromHistory(DOWN, startSessionDown);
          break;  
    }
    totalProfit += GetOrdersProfitBySide(side);
@@ -1762,8 +1804,6 @@ int IsOpen(int side)
          }
          break;         
    }
-
-
    return (-1);
 }
 //+------------------------------------------------------------------+
@@ -1833,7 +1873,7 @@ int GetHedgeMode(int side)
          
       case DOWN:
          slValue = GetHedgeSL(UpHedgeStopLoss, -AdditionalHedgeReenterPips);
-         if ((slValue >= (Bid + stopLevel)) || ())
+         if (slValue >= (Bid + stopLevel))
          {
             for (i = 1; i <= 3; i++)
             {
@@ -1871,19 +1911,19 @@ bool IsBreakEven(int side)
                if (IsBalanceOrderExist(side, OP_SELL))
                {
                   double balanceOrderOpenPrice = GetLastOrderOpenPrice(magicUpBalance, OP_SELL);
-                  if (Bid >= (balanceOrderOpenPrice + BalancePips*Point))
+                  if (Bid >= (balanceOrderOpenPrice + HedgeBalancePips*Point))
                      return (true);
                }
                
                if (IsBalanceOrderExist(side, OP_BUY))
                {
                   balanceOrderOpenPrice = GetLastOrderOpenPrice(magicUpBalance, OP_BUY);
-                  if (Ask <= (balanceOrderOpenPrice - BalancePips*Point))
+                  if (Ask <= (balanceOrderOpenPrice - HedgeBalancePips*Point))
                      return (true);
                }                 
                
                double 
-                  previousProfit = GetHedgeProfitFromHistory(magicUpHedge, OP_SELL, startSessionUp),             
+                  previousProfit = GetHedgeProfitFromHistory(UP, startSessionUp),             
                   neededProfit = lots * ProfitPerLot,       
                   currentTotalProfit = currentProfit + previousProfit; 
             
@@ -1903,18 +1943,18 @@ bool IsBreakEven(int side)
                if (IsBalanceOrderExist(side, OP_BUY))
                {
                   balanceOrderOpenPrice = GetLastOrderOpenPrice(magicDownBalance, OP_BUY);
-                  if (Bid >= (balanceOrderOpenPrice + BalancePips*Point))
+                  if (Bid >= (balanceOrderOpenPrice + HedgeBalancePips*Point))
                      return (true);
                }        
                
-               if (IsBalanceOrderExist(side, OP_BUY))
+               if (IsBalanceOrderExist(side, OP_SELL))
                {
                   balanceOrderOpenPrice = GetLastOrderOpenPrice(magicDownBalance, OP_SELL);
-                  if (Ask <= (balanceOrderOpenPrice - BalancePips*Point))
+                  if (Ask <= (balanceOrderOpenPrice - InitialBalancePips*Point))
                      return (true);
                }                
                
-               previousProfit = GetHedgeProfitFromHistory(magicDownHedge, OP_BUY, startSessionDown);               
+               previousProfit = GetHedgeProfitFromHistory(DOWN, startSessionDown);               
                neededProfit = lots * ProfitPerLot;         
                currentTotalProfit = currentProfit + previousProfit;
          
