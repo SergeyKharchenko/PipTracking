@@ -30,10 +30,10 @@ extern double    UnrealizedLoss   = 15;
 extern double    CriticalLoss     = 50;
 
 extern string    RestrictionSettings    = "------------------------------------------------";
-extern int       InitialRestrictionPips = 60;
-extern int       HedgeRestrictionPips   = 60;
 extern bool      InitialRestrictionUse  = true;
+extern int       InitialRestrictionPips = 60;
 extern bool      HedgeRestrictionUse    = true;
+extern int       HedgeRestrictionPips   = 60;
 
 extern string    HedgeSettings         = "------------------------------------------------";
 extern string    HedgeStopLoss_Help_1  = "0 - Moving Average";
@@ -179,225 +179,90 @@ int init()
    }
 
    if (MagicNumber <= 0) 
-   {
-      if (ShowAlerts)
-         Alert("MagicNumber is invalid");
-      work = false;
-      return; 
-   }      
+      ShowCriticalAlertAndStop("MagicNumber is invalid");      
    
-   if (TakeProfit < 0) {
-      if (ShowAlerts) {
-         Alert("TakeProfit is invalid");
-      }   
-      work = false;
-      return; 
-   }  
+   if (TakeProfit < 0) 
+      ShowCriticalAlertAndStop("TakeProfit is invalid");    
 
-   if (LotExponent < 1) {
-      if (ShowAlerts) {
-         Alert("LotExponent is invalid");
-      }   
-      work = false;
-      return; 
-   }     
+   if (LotExponent < 1) 
+		ShowCriticalAlertAndStop("LotExponent is invalid");
    
-   if (LotHedgeExponent < 1) {
-      if (ShowAlerts) {
-         Alert("LotHedgeExponent is invalid");
-      }   
-      work = false;
-      return; 
-   }       
+   if (LotHedgeExponent < 1) 
+		ShowCriticalAlertAndStop("LotHedgeExponent is invalid");
    
-   if (PipStep < 1) {
-      if (ShowAlerts) {
-         Alert("PipStep is invalid");
-      }   
-      work = false;
-      return; 
-   }          
+   if (PipStep < 1) 
+		ShowCriticalAlertAndStop("PipStep is invalid");
    
-   if (UnrealizedLoss <= 0) {
-      if (ShowAlerts) {
-         Alert("UnrealizedLoss is invalid");
-      }   
-      work = false;
-      return; 
-   }     
+   if (UnrealizedLoss <= 0) 
+		ShowCriticalAlertAndStop("UnrealizedLoss is invalid");
    
-   if ((UpHedgeStopLossLine < 0) || (UpHedgeStopLossLine > 3)) {
-      if (ShowAlerts) {
-         Alert("UpHedgeStopLossLine is invalid");
-      }   
-      work = false;
-      return; 
-   }       
+   if ((UpHedgeStopLossLine < 0) || (UpHedgeStopLossLine > 3)) 
+		ShowCriticalAlertAndStop("UpHedgeStopLossLine is invalid");
 
-   if ((DownHedgeStopLossLine < 0) || (DownHedgeStopLossLine > 3)) {
-      if (ShowAlerts) {
-         Alert("DownHedgeStopLossLine is invalid");
-      }   
-      work = false;
-      return; 
-   }       
+   if ((DownHedgeStopLossLine < 0) || (DownHedgeStopLossLine > 3)) 
+		ShowCriticalAlertAndStop("DownHedgeStopLossLine is invalid");
    
-   if (MAPeriod < 1) {
-      if (ShowAlerts) {
-         Alert("MAPeriod is invalid");
-      }   
-      work = false;
-      return; 
-   }      
+   if (MAPeriod < 1) 
+		ShowCriticalAlertAndStop("MAPeriod is invalid");
    
-   if (MAShift < 0) {
-      if (ShowAlerts) {
-         Alert("MAShift is invalid");
-      }   
-      work = false;
-      return; 
-   }                
+   if (MAShift < 0) 
+		ShowCriticalAlertAndStop("MAShift is invalid");
    
-   if (BBPeriod < 1) {
-      if (ShowAlerts) {
-         Alert("BBPeriod is invalid");
-      }   
-      work = false;
-      return; 
-   }     
+   if (BBPeriod < 1) 
+		ShowCriticalAlertAndStop("BBPeriod is invalid");
    
-   if (BBDeviation < 0) {
-      if (ShowAlerts) {
-         Alert("BBDeviation is invalid");
-      }   
-      work = false;
-      return; 
-   }               
+   if (BBDeviation < 0) 
+		ShowCriticalAlertAndStop("BBDeviation is invalid");
    
-   if (BBShift < 0) {
-      if (ShowAlerts) {
-         Alert("BBShift is invalid");
-      }   
-      work = false;
-      return; 
-   }           
+   if (BBShift < 0) 
+		ShowCriticalAlertAndStop("BBShift is invalid");
    
-   if ((MAMethod < 0) || (MAMethod > 3)) {
-      if (ShowAlerts) {
-         Alert("MAMethod is invalid");
-      }   
-      work = false;
-      return; 
-   }   
+   if (CriticalLoss <= 0) 
+		ShowCriticalAlertAndStop("CriticalLoss is invalid");	
    
-   if ((MAPrice < 0) || (MAPrice > 6)) {
-      if (ShowAlerts) {
-         Alert("MAPrice is invalid");
-      }   
-      work = false;
-      return; 
-   }   
+   if (OsMAFastEMA < 1) 
+		ShowCriticalAlertAndStop("OsMAFastEMA is invalid");
    
-   if ((BBPrice < 0) || (BBPrice > 6)) {
-      if (ShowAlerts) {
-         Alert("BBPrice is invalid");
-      }   
-      work = false;
-      return; 
-   }         
+   if (OsMASlowEMA < 1) 
+		ShowCriticalAlertAndStop("OsMASlowEMA is invalid");
    
-   if ((MATimeframe < 0) || (MATimeframe > 9)) {
-      if (ShowAlerts) {
-         Alert("MATimeframe is invalid");
-      }   
-      work = false;
-      return; 
-   }     
+   if (OsMASMA < 1) 
+		ShowCriticalAlertAndStop("OsMASMA is invalid");	
+	
+   if ((MAMethod < 0) || (MAMethod > 3)) 
+		ShowCriticalAlertAndStop("MAMethod is invalid");
    
-   if ((BBTimeframe < 0) || (BBTimeframe > 9)) {
-      if (ShowAlerts) {
-         Alert("BBTimeframe is invalid");
-      }   
-      work = false;
-      return; 
-   }        
+   if ((MAPrice < 0) || (MAPrice > 6)) 
+		ShowCriticalAlertAndStop("MAPrice is invalid");
    
-   if (OsMAFastEMA < 1) {
-      if (ShowAlerts) {
-         Alert("OsMAFastEMA is invalid");
-      }   
-      work = false;
-      return; 
-   }    
+   if ((BBPrice < 0) || (BBPrice > 6)) 
+		ShowCriticalAlertAndStop("BBPrice is invalid");
    
-   if (OsMASlowEMA < 1) {
-      if (ShowAlerts) {
-         Alert("OsMASlowEMA is invalid");
-      }   
-      work = false;
-      return; 
-   }    
+   if ((MATimeframe < 0) || (MATimeframe > 9)) 
+		ShowCriticalAlertAndStop("MATimeframe is invalid");
    
-   if (OsMASMA < 1) {
-      if (ShowAlerts) {
-         Alert("OsMASMA is invalid");
-      }   
-      work = false;
-      return; 
-   }     
+   if ((BBTimeframe < 0) || (BBTimeframe > 9)) 
+		ShowCriticalAlertAndStop("BBTimeframe is invalid");
    
-   if ((OsMATimeframe < 0) || (OsMATimeframe > 9)) {
-      if (ShowAlerts) {
-         Alert("OsMA is invalid");
-      }   
-      work = false;
-      return; 
-   }   
+   if ((OsMATimeframe < 0) || (OsMATimeframe > 9)) 
+		ShowCriticalAlertAndStop("OsMATimeframe is invalid");
    
-   if ((ACTimeframe < 0) || (ACTimeframe > 9)) {
-      if (ShowAlerts) {
-         Alert("ACTimeframe is invalid");
-      }   
-      work = false;
-      return; 
-   }  
+   if ((ACTimeframe < 0) || (ACTimeframe > 9)) 
+		ShowCriticalAlertAndStop("ACTimeframe is invalid");
    
-   if (CriticalLoss <= 0) {
-      if (ShowAlerts) {
-         Alert("CriticalLoss is invalid");
-      }   
-      work = false;
-      return; 
-   }    
+   if ((InitialRestrictionPips * Point) < (Ask - Bid)) 
+		ShowCriticalAlertAndStop("InitialRestrictionPips is invalid");
    
-   if ((InitialRestrictionPips * Point) < (Ask - Bid)) {
-      if (ShowAlerts) {
-         Alert("InitialRestrictionPips should be more than spread");
-      }   
-      work = false;
-      return; 
-   }    
-   
-   if ((HedgeRestrictionPips * Point) < (Ask - Bid)) {
-      if (ShowAlerts) {
-         Alert("HedgeRestrictionPips should be more than spread");
-      }   
-      work = false;
-      return; 
-   }     
+   if ((HedgeRestrictionPips * Point) < (Ask - Bid)) 
+		ShowCriticalAlertAndStop("HedgeRestrictionPips is invalid");   
    
    lot = NormalizeLots(LotSize, Symbol());
 
-   if (lot != LotSize) {
-      if (ShowAlerts) {
-         Alert("Warning: This LotSize is invalid for this broker");
-      }   
-      work = false;
-      return; 
-   }
+   if (lot != LotSize) 
+		ShowCriticalAlertAndStop("lot is invalid");
    
-      
-   startLot = lot;
+   if (!work)   
+      return;         
    
    if (MarketInfo(Symbol(), MODE_LOTSIZE) != 0)
       if (lot > (AccountFreeMargin() / MarketInfo(Symbol(), MODE_LOTSIZE))) {
@@ -1565,6 +1430,14 @@ bool IsLastRestrictionOrderSameType(int side, int orderType, datetime time)
 //=========================================================================================================
 // Support part
 //=========================================================================================================
+
+//+------------------------------------------------------------------+
+void ShowCriticalAlertAndStop(string alertText)
+{
+   Alert(alertText);
+   work = false;
+}
+//+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
 void LoadSession()
