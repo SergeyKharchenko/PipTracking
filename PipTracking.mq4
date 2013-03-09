@@ -14,39 +14,56 @@
 #include <WinUser32.mqh>
 
 //--- input parameters
-extern string    OrderSettings     = "------------------------------------------------";
-extern bool      OpenTrades        = true;
+extern bool      OpenTrades = true;
 
-extern string    HedgeStopLoss_Help_1 = "0 - Moving Average";
-extern string    HedgeStopLoss_Help_2 = "1 - Bollinger Bands Lowest";
-extern string    HedgeStopLoss_Help_3 = "2 - Bollinger Bands Medium";
-extern string    HedgeStopLoss_Help_4 = "3 - Bollinger Bands Highest";
-extern int       UpHedgeStopLoss      = 1;
-extern int       DownHedgeStopLoss    = 3;
-extern int       AdditionalSLPips     = 5;
-extern int       AdditionalHedgeReenterPips = 8;
+extern string    MagicNumber_Help = "Should be unique for each charts";
+extern int       MagicNumber      = 1234;
+
+extern string    StrategySettings = "------------------------------------------------";
+extern int       PipStep          = 25;
+extern double    LotSize          = 0.1;
+extern double    ProfitPerLot     = 30;
+extern int       TakeProfit       = 20;
+extern double    LotExponent      = 1.5;
+extern double    LotHedgeExponent = 2.5;
+extern double    UnrealizedLoss   = 15;
+extern double    CriticalLoss     = 50;
+
+extern string    RestrictionSettings    = "------------------------------------------------";
+extern int       InitialRestrictionPips = 60;
+extern int       HedgeRestrictionPips   = 60;
+extern bool      InitialRestrictionUse  = true;
+extern bool      HedgeRestrictionUse    = true;
+
+extern string    HedgeSettings         = "------------------------------------------------";
+extern string    HedgeStopLoss_Help_1  = "0 - Moving Average";
+extern string    HedgeStopLoss_Help_2  = "1 - Bollinger Bands Lowest";
+extern string    HedgeStopLoss_Help_3  = "2 - Bollinger Bands Medium";
+extern string    HedgeStopLoss_Help_4  = "3 - Bollinger Bands Highest";
+extern int       UpHedgeStopLossLine   = 1;
+extern int       DownHedgeStopLossLine = 3;
+extern int       AdditionalHedgeStopLossPips = 5;
+extern int       AdditionalHedgeReenterPips  = 8;
 
 extern string    IndicatorSettings = "------------------------------------------------";
 extern int       MAPeriod          = 14;
-extern string    IndicatorMAMethod_Help = "------------------------------------------------";
-extern string    MAMethod_Help_1 = "0 - Simple moving average";
-extern string    MAMethod_Help_2 = "1 - Exponential moving average";
-extern string    MAMethod_Help_3 = "2 - Smoothed moving average";
-extern string    MAMethod_Help_4 = "3 - Linear weighted moving average";
+extern string    MAMethod_Help_1   = "0 - Simple moving average";
+extern string    MAMethod_Help_2   = "1 - Exponential moving average";
+extern string    MAMethod_Help_3   = "2 - Smoothed moving average";
+extern string    MAMethod_Help_4   = "3 - Linear weighted moving average";
 extern int       MAMethod          = 0;
 extern int       MAShift           = 0;
 extern int       BBPeriod          = 20;
 extern int       BBDeviation       = 1;
 extern int       BBShift           = 0;
 
-extern string    IndicatorSettingsPrice_Help = "------------------------------------------------";
-extern string    IndicatorPrice_Help_1 = "0 - Close price";
-extern string    IndicatorPrice_Help_2 = "1 - Open price";
-extern string    IndicatorPrice_Help_3 = "2 - High price";
-extern string    IndicatorPrice_Help_4 = "3 - Low price";
-extern string    IndicatorPrice_Help_5 = "4 - Median price";
-extern string    IndicatorPrice_Help_6 = "5 - Typical price";
-extern string    IndicatorPrice_Help_7 = "6 - Weighted close price";
+extern string    MaAndBbIndicatorPrice_Help_1 = "0 - Close price";
+extern string    MaAndBbIndicatorPrice_Help_2 = "1 - Open price";
+extern string    MaAndBbIndicatorPrice_Help_3 = "2 - High price";
+extern string    MaAndBbIndicatorPrice_Help_4 = "3 - Low price";
+extern string    MaAndBbIndicatorPrice_Help_5 = "4 - Median price";
+extern string    MaAndBbIndicatorPrice_Help_6 = "5 - Typical price";
+extern string    MaAndBbIndicatorPrice_Help_7 = "6 - Weighted close price";
 extern int       MAPrice           = 0;
 extern int       BBPrice           = 0;
 
@@ -67,7 +84,6 @@ extern double    OsMAHedgeValue   = 0.0001;
 extern bool      UseAC        = true;
 extern double    ACHedgeValue = 0.0001;
 
-extern string    IndicatorSettingsTimeframe_Help = "------------------------------------------------";
 extern string    IndicatorTimeframe_Help_1  = "0 - Timeframe used on the chart";
 extern string    IndicatorTimeframe_Help_2  = "1 - 1 minute";
 extern string    IndicatorTimeframe_Help_3  = "2 - 5 minutes";
@@ -78,44 +94,22 @@ extern string    IndicatorTimeframe_Help_7  = "6 - 4 hours";
 extern string    IndicatorTimeframe_Help_8  = "7 - Daily";
 extern string    IndicatorTimeframe_Help_9  = "8 - Weekly";
 extern string    IndicatorTimeframe_Help_10 = "9 - Monthly";
-extern int       MATimeframe    = 0;
-extern int       BBTimeframe    = 0;
-extern int       OsMATimeframe  = 0;
-
-extern int       ACTimeframe  = 0;
-
-extern int       TakeProfit         = 20;
-extern double    ProfitPerLot       = 30;
-extern int       InitialRestrictionPips = 60;
-extern int       HedgeRestrictionPips   = 60;
-extern bool      UpRestrictionUse   = true;
-extern bool      DownRestrictionUse = true;
-
-extern string    LotSettings         = "------------------------------------------------";
-extern double    LotSize             = 0.1;
-extern double    LotExponent         = 1.5;
-extern double    LotHedgeExponent    = 2.5;
-
-extern string    StrategySettings  = "------------------------------------------------";
-extern int       PipStep           = 25;
-extern double    UnrealizedLoss    = 15;
-extern double    CriticalLoss      = 50;
-
-extern string    MagicNymberSettings = "------------------------------------------------";
-extern string    MagicNumber_Help    = "Should be unique for all charts";
-extern int       MagicNumber         = 1234;
+extern int       MATimeframe   = 0;
+extern int       BBTimeframe   = 0;
+extern int       OsMATimeframe = 0;
+extern int       ACTimeframe   = 0;
                                 
-extern string    SupportSettings = "------------------------------------------------";                           
-extern bool      ShowAlerts      = true;
-extern bool      ShowComments    = true;
-extern string    DisableEA_Help  = "If any error has occurred EA will close all positions and will be disable";
-extern bool      DisableEA       = false;
+extern string    AdditionalSettings = "------------------------------------------------";                           
+extern bool      ShowAlerts         = true;
+extern bool      ShowComments       = true;
+extern string    DisableEA_Help     = "If any error has occurred EA will close all positions and will be disable";
+extern bool      DisableEA          = false;
 
 // --> Global states
-#define NONE        -1
-#define SIMPLE       0
-#define MULTIPLE     1
-#define HEDGE        2
+#define NONE    -1
+#define SIMPLE   0
+#define MULTIPLE 1
+#define HEDGE    2
 #define RESTRICTION_BUY  3
 #define RESTRICTION_SELL 4
 #define BREAK_EVEN       5
@@ -178,7 +172,7 @@ int init()
    {
 	  TakeProfit *= 10;
 	  PipStep *= 10;	  
-	  AdditionalSLPips *= 10;
+	  AdditionalHedgeStopLossPips *= 10;
 	  AdditionalHedgeReenterPips *= 10;
 	  InitialRestrictionPips *= 10;
 	  HedgeRestrictionPips *= 10;
@@ -232,17 +226,17 @@ int init()
       return; 
    }     
    
-   if ((UpHedgeStopLoss < 0) || (UpHedgeStopLoss > 3)) {
+   if ((UpHedgeStopLossLine < 0) || (UpHedgeStopLossLine > 3)) {
       if (ShowAlerts) {
-         Alert("UpHedgeStopLoss is invalid");
+         Alert("UpHedgeStopLossLine is invalid");
       }   
       work = false;
       return; 
    }       
 
-   if ((DownHedgeStopLoss < 0) || (DownHedgeStopLoss > 3)) {
+   if ((DownHedgeStopLossLine < 0) || (DownHedgeStopLossLine > 3)) {
       if (ShowAlerts) {
-         Alert("DownHedgeStopLoss is invalid");
+         Alert("DownHedgeStopLossLine is invalid");
       }   
       work = false;
       return; 
@@ -423,8 +417,8 @@ int init()
    startSessionDown = -1;       
    hedgeWasClosedUp = -1;
    hedgeWasClosedDown = -1;
-   hedgeCapturedSLUp = UpHedgeStopLoss;
-   hedgeCapturedSLDown = DownHedgeStopLoss;
+   hedgeCapturedSLUp = UpHedgeStopLossLine;
+   hedgeCapturedSLDown = DownHedgeStopLossLine;
    MATimeframe = TranslatePeriod(MATimeframe);
    BBTimeframe = TranslatePeriod(BBTimeframe);
    OsMATimeframe = TranslatePeriod(OsMATimeframe);
@@ -490,8 +484,8 @@ int start()
       startSessionDown = -1;       
       hedgeWasClosedUp = -1;
       hedgeWasClosedDown = -1;
-      hedgeCapturedSLUp = UpHedgeStopLoss;
-      hedgeCapturedSLDown = DownHedgeStopLoss;
+      hedgeCapturedSLUp = UpHedgeStopLossLine;
+      hedgeCapturedSLDown = DownHedgeStopLossLine;
    }   
    else
    {
@@ -576,7 +570,7 @@ int start()
                         if (lot == -1) 
                            break;
                         hedgeWasClosedUp = 0;
-                        double slValue = GetHedgeSL(hedgeCapturedSLUp, AdditionalSLPips);
+                        double slValue = GetHedgeSL(hedgeCapturedSLUp, AdditionalHedgeStopLossPips);
                         slOp = CastSLToPoints(slValue, OP_SELL);      
                         int magicHedge = magicUpHedge;
                         if (stateUp == RESTRICTION_SELL)
@@ -664,7 +658,7 @@ int start()
                         if (lot == -1) 
                            break;                     
                         hedgeWasClosedDown = 0;
-                        slValue = GetHedgeSL(hedgeCapturedSLDown, -AdditionalSLPips);
+                        slValue = GetHedgeSL(hedgeCapturedSLDown, -AdditionalHedgeStopLossPips);
                         slOp = CastSLToPoints(slValue, OP_BUY);     
                         magicHedge = magicDownHedge;
                         if (stateUp == RESTRICTION_SELL)
@@ -705,107 +699,160 @@ int start()
 int IsOpen(int side)
 {
    RefreshRates();
-   switch (side)
-   {
-      case UP:            
-         if ((GetOrdersCount(magicUpHedge, OP_SELL) == 0) && (GetOrdersCount(magicUpRestriction, OP_SELL) == 0))   // No Hedge order
-         {            
-            if (GetOrdersCountBySide(UP) == 0)
-               return (SIMPLE);      
-               
-            if (hedgeWasClosedUp == -1)  // First hedge
-            {
-               if (IsUnrealizedLoss(UP))
-               {
-                  int hedgeSLMode = GetHedgeIndicatorLine(UP);
-                  if ((hedgeSLMode != -1) 
-                      && IsIndicatorsAllowHedge(UP))
-                  {
-                     hedgeCapturedSLUp = hedgeSLMode;
-                     return (HEDGE);
-                  }
-               }     
-               else
-               {   
-                  double lastOrderOpenPrice = MathMinBlocked(GetLastOrderOpenPrice(magicUpSimple, OP_BUY),
-                                                             GetLastOrderOpenPrice(magicUpMultiple, OP_BUY), -1);                                                        
-                                                      
-                  if (((Ask + PipStep * Point) <= lastOrderOpenPrice) && (lastOrderOpenPrice != -1))
-                     return (MULTIPLE);      
-               }                 
-            }
-            else  // Not first hedge
-            {               
-               double simpleOrderOpenPrice = GetLastOrderOpenPrice(magicUpSimple, OP_BUY);
-               if ((Ask > simpleOrderOpenPrice) && !IsLastRestrictionOrderSameType(UP, OP_BUY, startSessionUp))
-                  return (RESTRICTION_BUY);
-                                   
-            
-               bool isOpen = false;
-               double lastHedgeOpenPrice = GetLastHedgeOpenPrice(magicUpHedge, OP_SELL, startSessionUp);
-               if ((Bid < lastHedgeOpenPrice)
-                   && (Bid < GetHedgeSL(hedgeCapturedSLUp, -AdditionalHedgeReenterPips))
-                   && IsIndicatorsAllowHedge(UP))
-                  isOpen = true;  
-               
-               if (isOpen)                  
-                  if (!hedgeWasClosedUp || !UpRestrictionUse)
-                     return (HEDGE);
-                  else
-                     return (RESTRICTION_SELL);
-            }
-         }
-         break;
-         
-      case DOWN:        
-         if ((GetOrdersCount(magicDownHedge, OP_BUY) == 0) && (GetOrdersCount(magicDownRestriction, OP_BUY) == 0))  // No hedge order
-         {
-            if (GetOrdersCountBySide(DOWN) == 0)
-               return (SIMPLE);
-         
-            if (hedgeWasClosedDown == -1)  // First hedge
-            {
-               if (IsUnrealizedLoss(DOWN))
-               {                                   
-                  hedgeSLMode = GetHedgeIndicatorLine(DOWN);                   
-                  if ((hedgeSLMode != -1)                  
-                      && IsIndicatorsAllowHedge(DOWN))
-                  {
-                     hedgeCapturedSLDown = hedgeSLMode;
-                     return (HEDGE);
-                  }
-               }      
-               else
-               {               
-                  lastOrderOpenPrice = MathMax(GetLastOrderOpenPrice(magicDownSimple, OP_SELL),
-                                               GetLastOrderOpenPrice(magicDownMultiple, OP_SELL));
-                  if ((Bid - PipStep * Point) >= lastOrderOpenPrice)
-                     return (MULTIPLE);   
-               }                 
-            }
-            else  // Not first hedge
-            {                
-               simpleOrderOpenPrice = GetLastOrderOpenPrice(magicDownSimple, OP_SELL);
-               if ((Bid < simpleOrderOpenPrice) && !IsLastRestrictionOrderSameType(DOWN, OP_SELL, startSessionDown))
-                  return (RESTRICTION_SELL);  
-            
-               isOpen = false;
-               lastHedgeOpenPrice = GetLastHedgeOpenPrice(magicDownHedge, OP_BUY, startSessionDown);
-               if ((Ask > lastHedgeOpenPrice)
-                   && (Ask > GetHedgeSL(hedgeCapturedSLDown, AdditionalHedgeReenterPips))
-                   && IsIndicatorsAllowHedge(DOWN))
-                     isOpen = true;
-                     
-               if (isOpen)                  
-                  if (!hedgeWasClosedUp || !DownRestrictionUse)
-                     return (HEDGE);
-                  else
-                     return (RESTRICTION_BUY);                     
-            }
-         }
-         break;         
-   }
+   
+	if (IsOpenSimple(side))
+		return (SIMPLE);
+		
+	if (IsOpenMultiple(side))
+		return (MULTIPLE);
+	
+	switch (side)
+	{
+		case UP:
+			if (IsOpenFirstHedge(UP, hedgeCapturedSLUp))
+				return (HEDGE);
+				
+			if (IsSameSideRestrictionOpen(UP))
+				return (RESTRICTION_BUY);
+				
+			if (IsHedgeReenterOpen(UP))
+				if (HedgeRestrictionUse)
+					return (RESTRICTION_SELL);
+				else
+					return (HEDGE);
+			break;
+		case DOWN:
+			if (IsOpenFirstHedge(DOWN, hedgeCapturedSLDown))
+				return (HEDGE);
+				
+			if (IsSameSideRestrictionOpen(DOWN))
+				return (RESTRICTION_SELL);		
+								
+			if (IsHedgeReenterOpen(DOWN))
+				if (HedgeRestrictionUse)
+					return (RESTRICTION_BUY);
+				else
+					return (HEDGE);
+			break;
+	}
+	
    return (-1);
+}
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+bool IsOpenSimple(int side)
+{
+	return (GetOrdersCountBySide(side) == 0);
+}	
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+bool IsOpenMultiple(int side)
+{
+	if (IsUnrealizedLoss(side))
+		return (false);
+	switch (side)
+	{
+		case UP:
+			if (hedgeWasClosedUp != -1)
+				return (false);
+				double lastOrderOpenPrice = MathMinBlocked(GetLastOrderOpenPrice(magicUpSimple, OP_BUY),
+																		 GetLastOrderOpenPrice(magicUpMultiple, OP_BUY), -1);	
+				if (((Ask + PipStep * Point) <= lastOrderOpenPrice) && (lastOrderOpenPrice != -1))
+					return (true);  
+			break;
+		case DOWN:
+			if (hedgeWasClosedDown != -1)
+				return (false);		
+				lastOrderOpenPrice = MathMax(GetLastOrderOpenPrice(magicDownSimple, OP_SELL),
+													  GetLastOrderOpenPrice(magicDownMultiple, OP_SELL));
+				if ((Bid - PipStep * Point) >= lastOrderOpenPrice)
+					return (true); 
+			break;			
+	}
+	return (false);
+}	
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+bool IsOpenFirstHedge(int side, int& slMode)
+{
+	if (!IsUnrealizedLoss(side))
+		return (false);
+	switch (side)
+	{
+		case UP:
+			if (hedgeWasClosedUp != -1)
+				return (false);
+			break;
+		case DOWN:
+			if (hedgeWasClosedDown != -1)
+				return (false);	
+			break;			
+	}
+	int hedgeSLMode = GetHedgeIndicatorLine(side);
+	if ((hedgeSLMode != -1) 
+		 && IsIndicatorsAllowHedge(side))
+	{
+		slMode = hedgeSLMode;
+		return (true);
+	}
+	return (false);
+}
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+bool IsSameSideRestrictionOpen(int side)
+{
+	if (!InitialRestrictionUse)
+		return (false);
+	switch (side)
+	{
+		case UP:
+			if (hedgeWasClosedUp == -1)			
+				return (false);
+			double simpleOrderOpenPrice = GetLastOrderOpenPrice(magicUpSimple, OP_BUY);
+			if ((Ask > simpleOrderOpenPrice) && !IsLastRestrictionOrderSameType(UP, OP_BUY, startSessionUp))
+				return (true);
+			break;
+		case DOWN:
+			if (hedgeWasClosedDown == -1)
+				return (false);	
+			simpleOrderOpenPrice = GetLastOrderOpenPrice(magicDownSimple, OP_SELL);
+			if ((Bid < simpleOrderOpenPrice) && !IsLastRestrictionOrderSameType(DOWN, OP_SELL, startSessionDown))
+				return (true);  				
+			break;			
+	}
+	return (false);
+}
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+bool IsHedgeReenterOpen(int side)
+{
+	switch (side)
+	{
+		case UP:
+			if (hedgeWasClosedUp != 1)
+				return (false);
+			double lastHedgeOpenPrice = GetLastHedgeOpenPrice(magicUpHedge, OP_SELL, startSessionUp);
+			if ((Bid < lastHedgeOpenPrice)
+				 && (Bid < GetHedgeSL(hedgeCapturedSLUp, -AdditionalHedgeReenterPips))
+				 && IsIndicatorsAllowHedge(UP))
+				return (true);
+			break;
+		case DOWN:
+			if (hedgeWasClosedDown != 1)
+				return (false);	
+			lastHedgeOpenPrice = GetLastHedgeOpenPrice(magicDownHedge, OP_BUY, startSessionDown);
+			if ((Ask > lastHedgeOpenPrice)
+				 && (Ask > GetHedgeSL(hedgeCapturedSLDown, AdditionalHedgeReenterPips))
+				 && IsIndicatorsAllowHedge(DOWN))
+				return (true);			
+			break;			
+	}
+	return (false);
 }
 //+------------------------------------------------------------------+
 
@@ -1031,8 +1078,8 @@ bool IsTakeProfitForSimpleState(int side)
 //+------------------------------------------------------------------+
 bool IsIndicatorsAllowHedge(int side)
 {
-   return ((IsOsMAAllowHedge(side) || !UseOsMA)
-           && (IsACAllowHedge(side) || !UseAC));
+   return ((!UseOsMA || IsOsMAAllowHedge(side))
+           && (!UseAC || IsACAllowHedge(side)));
 }
 //+------------------------------------------------------------------+
 
@@ -1075,36 +1122,36 @@ int GetHedgeIndicatorLine(int side)
    switch (side)
    {        
       case UP:
-         double slValue = GetHedgeSL(DownHedgeStopLoss, AdditionalHedgeReenterPips);                  
+         double slValue = GetHedgeSL(DownHedgeStopLossLine, AdditionalHedgeReenterPips);                  
          if (slValue < (Ask + stopLevel))
          {
             for (int i = 3; i >= 1; i--)
             {
-               slValue = GetHedgeSL(UpHedgeStopLoss, AdditionalHedgeReenterPips);
+               slValue = GetHedgeSL(UpHedgeStopLossLine, AdditionalHedgeReenterPips);
                if (slValue > (Ask + stopLevel))
                   return (i);
             }
          }
          else
          {
-            return (DownHedgeStopLoss);
+            return (DownHedgeStopLossLine);
          }      
          break;
          
       case DOWN:
-         slValue = GetHedgeSL(UpHedgeStopLoss, -AdditionalHedgeReenterPips);
+         slValue = GetHedgeSL(UpHedgeStopLossLine, -AdditionalHedgeReenterPips);
          if (slValue >= (Bid + stopLevel))
          {
             for (i = 1; i <= 3; i++)
             {
-               slValue = GetHedgeSL(UpHedgeStopLoss, -AdditionalHedgeReenterPips);
+               slValue = GetHedgeSL(UpHedgeStopLossLine, -AdditionalHedgeReenterPips);
                if (slValue < (Bid - stopLevel))
                   return (i);
             }
          }
          else
          {
-            return (UpHedgeStopLoss);
+            return (UpHedgeStopLossLine);
          }
          break;         
    }
@@ -1159,7 +1206,7 @@ void TrailingHedgeByIndicatorLine(int magic, int type, int attempts = 5)
                
                if (OrderType() == OP_BUY)
                {
-                  double slValue = GetHedgeSL( hedgeCapturedSLDown, -AdditionalSLPips);                                    
+                  double slValue = GetHedgeSL( hedgeCapturedSLDown, -AdditionalHedgeStopLossPips);                                    
                   int newSLpt = CastSLToPoints(slValue, OP_BUY);                                  
                   int checkedSLpt = CheckStop(newSLpt, 0);          
                   double newSL = NormalizeDouble(Ask - checkedSLpt * Point, Digits);                             
@@ -1171,7 +1218,7 @@ void TrailingHedgeByIndicatorLine(int magic, int type, int attempts = 5)
 
                if (OrderType() == OP_SELL)
                {                  
-                  slValue = GetHedgeSL(hedgeCapturedSLUp, AdditionalSLPips);
+                  slValue = GetHedgeSL(hedgeCapturedSLUp, AdditionalHedgeStopLossPips);
                   newSLpt = CastSLToPoints(slValue, OP_SELL);
                   checkedSLpt = CheckStop(newSLpt, 0);                  
                   newSL = NormalizeDouble(Bid + checkedSLpt * Point, Digits);
