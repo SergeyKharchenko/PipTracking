@@ -29,11 +29,11 @@ extern double    LotHedgeExponent = 2.5;
 extern double    UnrealizedLoss   = 15;
 extern double    CriticalLoss     = 50;
 
-extern string    RestrictionSettings    = "------------------------------------------------";
-extern bool      InitialRestrictionUse  = true;
-extern int       InitialRestrictionPips = 60;
-extern bool      HedgeRestrictionUse    = true;
-extern int       HedgeRestrictionPips   = 60;
+extern string    RestrictionSettings        = "------------------------------------------------";
+extern bool      InitialRestrictionUpUse    = true;
+extern bool      InitialRestrictionDownUse  = true;
+extern int       InitialRestrictionPips     = 60;
+extern int       HedgeRestrictionPips       = 60;
 
 extern string    HedgeSettings         = "------------------------------------------------";
 extern string    HedgeStopLoss_Help_1  = "0 - Moving Average";
@@ -163,7 +163,6 @@ int init()
 	  AdditionalHedgeStopLossPips *= 10;
 	  AdditionalHedgeReenterPips *= 10;
 	  InitialRestrictionPips *= 10;
-	  HedgeRestrictionPips *= 10;
    }
 
    if (MagicNumber <= 0) 
@@ -239,10 +238,11 @@ int init()
 		ShowCriticalAlertAndStop("ACTimeframe is invalid");
    
    if ((InitialRestrictionPips * Point) < (Ask - Bid)) 
-		ShowCriticalAlertAndStop("InitialRestrictionPips is invalid");
-   
+		ShowCriticalAlertAndStop("InitialRestrictionPips is invalid");  
+		
    if ((HedgeRestrictionPips * Point) < (Ask - Bid)) 
-		ShowCriticalAlertAndStop("HedgeRestrictionPips is invalid");   
+		ShowCriticalAlertAndStop("InitialRestrictionPips is invalid"); 		
+		  
    
    double lot = NormalizeLots(LotSize, Symbol());
 
@@ -487,10 +487,7 @@ int GetOpenState(int side)
 				return (RESTRICTION_INITIAL);
 				
 			if (IsHedgeReenterOpen(UP))
-				if (HedgeRestrictionUse)
-					return (RESTRICTION_HEDGE);
-				else
-					return (HEDGE);
+			   return (HEDGE);
 			break;
 		case DOWN:
 			if (IsOpenFirstHedge(DOWN))
@@ -500,10 +497,7 @@ int GetOpenState(int side)
 				return (RESTRICTION_INITIAL);		
 								
 			if (IsHedgeReenterOpen(DOWN))
-				if (HedgeRestrictionUse)
-					return (RESTRICTION_HEDGE);
-				else
-					return (HEDGE);
+			   return (HEDGE);
 			break;
 	}
 	
@@ -567,8 +561,10 @@ bool IsOpenFirstHedge(int side)
 //+------------------------------------------------------------------+
 bool IsSameSideRestrictionOpen(int side)
 {
-	if (!InitialRestrictionUse)
+	if ((side == UP) && !InitialRestrictionUpUse)
 		return (false);
+	if ((side == DOWN) && !InitialRestrictionDownUse)
+		return (false);		
 	switch (side)
 	{
 		case UP:
