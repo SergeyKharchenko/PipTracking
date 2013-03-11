@@ -475,31 +475,16 @@ int GetOpenState(int side)
 		return (SIMPLE);
 		
 	if (IsOpenMultiple(side))
-		return (MULTIPLE);
+		return (MULTIPLE);	
 	
-	switch (side)
-	{
-		case UP:
-			if (IsOpenFirstHedge(UP))
-				return (HEDGE);
-				
-			if (IsSameSideRestrictionOpen(UP))
-				return (RESTRICTION_INITIAL);
-				
-			if (IsHedgeReenterOpen(UP))
-			   return (HEDGE);
-			break;
-		case DOWN:
-			if (IsOpenFirstHedge(DOWN))
-				return (HEDGE);
-				
-			if (IsSameSideRestrictionOpen(DOWN))
-				return (RESTRICTION_INITIAL);		
-								
-			if (IsHedgeReenterOpen(DOWN))
-			   return (HEDGE);
-			break;
-	}
+	if (IsOpenFirstHedge(side))
+		return (HEDGE);	
+	
+	if (IsInitialRestrictionOpen(side))
+		return (RESTRICTION_INITIAL);		
+	
+	if (IsHedgeRestrictionOpen(side))
+	   return (RESTRICTION_HEDGE);	
 	
    return (-1);
 }
@@ -559,7 +544,7 @@ bool IsOpenFirstHedge(int side)
 //+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
-bool IsSameSideRestrictionOpen(int side)
+bool IsInitialRestrictionOpen(int side)
 {
 	if ((side == UP) && !InitialRestrictionUpUse)
 		return (false);
@@ -587,7 +572,7 @@ bool IsSameSideRestrictionOpen(int side)
 //+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
-bool IsHedgeReenterOpen(int side)
+bool IsHedgeRestrictionOpen(int side)
 {
 	if (hedgeWasClosed[side] != 1)
 		return (false);
