@@ -164,6 +164,7 @@ int init()
 	  AdditionalHedgeStopLossPips *= 10;
 	  AdditionalHedgeReenterPips *= 10;
 	  InitialRestrictionPips *= 10;
+	  HedgeRestrictionPips *= 10;
    }
 
    if (MagicNumber <= 0) 
@@ -443,16 +444,18 @@ void OpenOrders(int side)
 			double slValue = GetHedgeSL(hedgeCapturedSl[side], AdditionalHedgeStopLossPips);
 			sl = CastSLToPoints(slValue, oppositeOrderType);      
 			magic = magicHedge[side];
-			if (state[side] == RESTRICTION_HEDGE)
-				magic = magicRestriction[side];                                 
+			if (state[side] == RESTRICTION_HEDGE){
+				magic = magicRestriction[side];    
+				debug = true;
+				}                             
 
 			orderType = oppositeOrderType;
 			orderOpenPrice = oppositeOrderOpenPrice;
 			orderColor = oppositeOrderColor;
-			
 			break;		
 
 		case RESTRICTION_INITIAL:
+		   debug = true;
 			magic = magicRestriction[side];
 			break; 
 	}
@@ -662,20 +665,17 @@ double CalculateLotByState(int side, int newState)
 void ProcessHedgeOrders(int side)
 {
 	int orderType;
-	int restrictionStateType;
 	switch (side)
 	{
 		case UP: 
 			orderType = OP_SELL; 
-			restrictionStateType = RESTRICTION_HEDGE;
 			break;
 		case DOWN: 
 			orderType = OP_BUY; 
-			restrictionStateType = RESTRICTION_HEDGE;
 			break;
 	}
 	
-	if ((state[side] == HEDGE) || (state[side] == restrictionStateType))
+	if ((state[side] == HEDGE) || (state[side] == RESTRICTION_HEDGE))
 	{
 		int hedgeOrderCount = GetOrdersCount(magicHedge[side], orderType);
 		int hedgeRestrictionOrderCount = GetOrdersCount(magicRestriction[side], orderType);
@@ -688,7 +688,7 @@ void ProcessHedgeOrders(int side)
 		}   
 		else
 		{
-			hedgeWasClosed[0] = 1;
+			hedgeWasClosed[side] = 1;
 		}  
 	}
 }
@@ -726,8 +726,8 @@ bool IsBreakEven(int side)
 					
                if (GetOrdersCount(magicRestriction[0], OP_SELL) > 0)
                {
-                  double restrictionPrice = GetLastOrderOpenPrice(magicRestriction[0], OP_SELL);
-                  if (Bid <= (restrictionPrice - HedgeRestrictionPips*Point))
+                  double restrictionPrice = GetLastHedgeClosePrice(magicHedge[0], OP_SELL, startSession[0]);
+                  if (Ask <= (restrictionPrice - HedgeRestrictionPips*Point))
                      return (true);
                }
                
@@ -758,8 +758,8 @@ bool IsBreakEven(int side)
             default:
                if (GetOrdersCount(magicRestriction[1], OP_BUY) > 0)
                {
-                  restrictionPrice = GetLastOrderOpenPrice(magicRestriction[1], OP_BUY);
-                  if (Ask >= (restrictionPrice + HedgeRestrictionPips*Point))
+                  restrictionPrice = GetLastHedgeClosePrice(magicHedge[0], OP_BUY, startSession[1]);
+                  if (Bid >= (restrictionPrice + HedgeRestrictionPips*Point))
                      return (true);
                }        
                
@@ -846,28 +846,19 @@ void GlobalTrailing(int side, int attempts = 10)
 //+------------------------------------------------------------------+
 bool IsTakeProfitForSimpleState(int side)
 {
+   if (GetOrdersCountBySide(side) != 1)
+      return (false);
+      
    switch (side)
    {
       case UP:
-         switch (GetOrdersCount(magicSimple[0], OP_BUY))
-         {
-            case 0: return (false);
-            case 1: 
-               if (Bid >= (GetLastOrderOpenPrice(magicSimple[0], OP_BUY) + TakeProfit * Point))
-                  return (true);
-               break;
-         }
+         if (Bid >= (GetLastOrderOpenPrice(magicSimple[0], OP_BUY) + TakeProfit * Point))
+            return (true);
          break;
          
       case DOWN:
-         switch (GetOrdersCount(magicSimple[1], OP_SELL))         
-         {
-            case 0: return (false);
-            case 1: 
-               if (Ask <= (GetLastOrderOpenPrice(magicSimple[1], OP_SELL) - TakeProfit * Point))
-                  return (true);
-               break;               
-         }
+         if (Ask <= (GetLastOrderOpenPrice(magicSimple[1], OP_SELL) - TakeProfit * Point))
+            return (true);
          break;
    }      
 
@@ -1103,7 +1094,7 @@ int GetLastOrderTicket(int magic, int type, int mode)
    int orderOpenTime = 0;
    int ticket = 0;
    
-   switch (mode)
+   switch (mode == MODE_HISTORY)
    {
       case MODE_TRADES:
          for (int i = OrdersTotal() - 1; i >= 0; i--)  
@@ -1125,10 +1116,10 @@ int GetLastOrderTicket(int magic, int type, int mode)
          for (i = OrdersHistoryTotal() - 1; i >= 0; i--)  
          {
             if (OrderSelect(i, SELECT_BY_POS, MODE_HISTORY))
-            {
-               if (OrderSymbol() != Symbol()) continue;
-               if (OrderMagicNumber() != magic) continue;                                
-               if (OrderType() != type) continue;  
+            {               
+               if (OrderSymbol() != Symbol()) continue;                                              
+               if (OrderType() != type) continue;                 
+               if (OrderMagicNumber() != magic) continue; 
                if (orderOpenTime < OrderOpenTime())
                {
                   orderOpenTime = OrderOpenTime();
