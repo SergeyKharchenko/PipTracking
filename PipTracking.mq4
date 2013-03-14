@@ -33,8 +33,8 @@ extern double    UnrealizedLoss   = 15;
 extern double    CriticalLoss     = 50;
 
 extern string    RestrictionSettings       = "------------------------------------------------";
-extern int       InitialRestrictionPips    = 60;
-extern int       HedgeRestrictionPips      = 60;
+extern int       InitialRestrictionPips    = 10;
+extern int       HedgeRestrictionPips      = 10;
 
 extern string    HedgeSettings         = "------------------------------------------------";
 extern string    HedgeStopLoss_Help_1  = "0 - Moving Average";
@@ -444,10 +444,9 @@ void OpenOrders(int side)
 			double slValue = GetHedgeSL(hedgeCapturedSl[side], AdditionalHedgeStopLossPips);
 			sl = CastSLToPoints(slValue, oppositeOrderType);      
 			magic = magicHedge[side];
-			if (state[side] == RESTRICTION_HEDGE){
-				magic = magicRestriction[side];    
-				debug = true;
-				}                             
+			if (state[side] == RESTRICTION_HEDGE)
+				magic = magicRestriction[side]; 
+			   
 
 			orderType = oppositeOrderType;
 			orderOpenPrice = oppositeOrderOpenPrice;
@@ -455,7 +454,6 @@ void OpenOrders(int side)
 			break;		
 
 		case RESTRICTION_INITIAL:
-		   debug = true;
 			magic = magicRestriction[side];
 			break; 
 	}
@@ -463,6 +461,13 @@ void OpenOrders(int side)
 	ticket = OpenOrderA(Symbol(), orderType, lot, orderOpenPrice, sl, 0, 100, NULL, magic, 5, 0, orderColor);  
 	if (DisplayError(ticket))
 		state[side] = NONE;	
+	else
+	{
+	  if (state[side] == RESTRICTION_HEDGE)
+	     Notify("Restriction hedge order has been opened with lots amount: " + DoubleToStr(lot, 2) + " by " + SideToString(side) + " side");
+	  if (state[side] == RESTRICTION_INITIAL)
+	     Notify("Restriction initial order has been opened with lots amount: " + DoubleToStr(lot, 2) + " by " + SideToString(side) + " side");
+	}	
 }
 //+------------------------------------------------------------------+
 
@@ -728,14 +733,20 @@ bool IsBreakEven(int side)
                {
                   double restrictionPrice = GetLastHedgeClosePrice(magicHedge[0], OP_SELL, startSession[0]);
                   if (Ask <= (restrictionPrice - HedgeRestrictionPips*Point))
+                  {
+                     Notify("Break even by hedge restriction pips has been triggered by UP side");
                      return (true);
+                  }   
                }
                
                if (GetOrdersCount(magicRestriction[0], OP_BUY) > 0)
                {
                   restrictionPrice = GetLastHedgeClosePrice(magicHedge[0], OP_SELL, startSession[0]);
                   if (Bid >= (restrictionPrice + HedgeRestrictionPips*Point))
+                  {
+                     Notify("Break even by initial restriction pips has been triggered by UP side");
                      return (true);
+                  } 
                }                 
                
                double 
@@ -744,7 +755,10 @@ bool IsBreakEven(int side)
                   currentTotalProfit = currentProfit + previousProfit; 
             
                if (currentTotalProfit >= neededProfit)
+               {
+                  Notify("Break even by profit per lot has triggered by UP side");
                   return (true);
+               } 
                break;
          }
          break;
@@ -760,14 +774,20 @@ bool IsBreakEven(int side)
                {
                   restrictionPrice = GetLastHedgeClosePrice(magicHedge[0], OP_BUY, startSession[1]);
                   if (Bid >= (restrictionPrice + HedgeRestrictionPips*Point))
+                  {
+                     Notify("Break even by hedge restriction pips has been triggered by DOWN side");
                      return (true);
+                  } 
                }        
                
                if (GetOrdersCount(magicRestriction[1], OP_SELL) > 0)
                {
                   restrictionPrice = GetLastHedgeClosePrice(magicHedge[0], OP_BUY, startSession[1]);
                   if (Ask <= (restrictionPrice - InitialRestrictionPips*Point))
+                  {
+                     Notify("Break even by initial restriction pips has been triggered by DOWN side");
                      return (true);
+                  } 
                }                
                
                previousProfit = GetHedgeProfitFromHistory(DOWN, startSession[1]);               
@@ -775,7 +795,10 @@ bool IsBreakEven(int side)
                currentTotalProfit = currentProfit + previousProfit;
          
                if (currentTotalProfit >= neededProfit)
+               {
+                  Notify("Break even by profit per lot has triggered by UP side");
                   return (true);
+               } 
                break;   
          }
          break;
@@ -853,12 +876,18 @@ bool IsTakeProfitForSimpleState(int side)
    {
       case UP:
          if (Bid >= (GetLastOrderOpenPrice(magicSimple[0], OP_BUY) + TakeProfit * Point))
+         {
+            Notify("Take profit point has been reached by UP side");
             return (true);
+         } 
          break;
          
       case DOWN:
          if (Ask <= (GetLastOrderOpenPrice(magicSimple[1], OP_SELL) - TakeProfit * Point))
+         {
+            Notify("Take profit point has been reached by DOWN side");
             return (true);
+         } 
          break;
    }      
 
@@ -1363,6 +1392,18 @@ bool IsLastRestrictionOrderSameType(int side, int orderType, datetime time)
 //=========================================================================================================
 
 //+------------------------------------------------------------------+
+string SideToString(int side)
+{
+   switch (side)
+   {
+      case UP: return ("UP");
+      case DOWN: return ("DOWN");
+   }
+   return ("");
+}
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
 void ShowCriticalAlertAndStop(string alertText)
 {
    Alert(alertText);
@@ -1731,11 +1772,27 @@ void ShowStatistics()
                
             double lotsRestriction = -1;   
             if (state[0] == RESTRICTION_HEDGE) 
+            {
                lotsRestriction = GetLastOrderLots(magicRestriction[0], OP_SELL);
+               if (lotsRestriction != -1)
+               {
+                  upSideComment = upSideComment + "     Restriction hedge lots: " + DoubleToStr(lotsRestriction, 2) + "\n";  
+                  double restrictionPrice = GetLastHedgeClosePrice(magicHedge[0], OP_SELL, startSession[0]);
+                  double restrictionTargerPrice = restrictionPrice - HedgeRestrictionPips*Point;
+                  upSideComment = upSideComment + "     Restriction targer price for Ask: " + DoubleToStr(restrictionTargerPrice, Digits) + "\n";  
+               }   
+            }   
             if (state[0] == RESTRICTION_INITIAL)   
+            {
                lotsRestriction = GetLastOrderLots(magicRestriction[0], OP_BUY);
-            if (lotsRestriction != -1)
-               upSideComment = upSideComment + "     Restriction lots: " + DoubleToStr(lotsRestriction, 2) + "\n";
+               if (lotsRestriction != -1)
+               {   
+                  upSideComment = upSideComment + "     Restriction initial lots: " + DoubleToStr(lotsRestriction, 2) + "\n";  
+                  restrictionPrice = GetLastHedgeClosePrice(magicHedge[0], OP_SELL, startSession[0]);
+                  restrictionTargerPrice = restrictionPrice + HedgeRestrictionPips*Point;
+                  upSideComment = upSideComment + "     Restriction targer price for Bid: " + DoubleToStr(restrictionTargerPrice, Digits) + "\n";                 
+               }   
+            }   
             break;   
       }
       double targetCriticalLoss = startMoney[0] - GetTargetLossByPercent(UP, CriticalLoss);
@@ -1786,11 +1843,27 @@ void ShowStatistics()
                
             lotsRestriction = -1;   
             if (state[1] == RESTRICTION_HEDGE)   
+            {
                lotsRestriction = GetLastOrderLots(magicRestriction[1], OP_BUY);            
+               if (lotsRestriction != -1)
+               {
+                  downSideComment = downSideComment + "     Restriction hedge lots: " + DoubleToStr(lotsRestriction, 2) + "\n";                                      
+                  restrictionPrice = GetLastHedgeClosePrice(magicHedge[0], OP_BUY, startSession[1]);
+                  restrictionTargerPrice = restrictionPrice + HedgeRestrictionPips*Point;
+                  downSideComment = downSideComment + "     Restriction targer price for Bid: " + DoubleToStr(restrictionTargerPrice, Digits) + "\n";                                              
+               }   
+            }   
             if (state[1] == RESTRICTION_INITIAL) 
+            {
                lotsRestriction = GetLastOrderLots(magicRestriction[1], OP_SELL);
-            if (lotsRestriction != -1)
-               downSideComment = downSideComment + "     Restriction lots: " + DoubleToStr(lotsRestriction, 2) + "\n";               
+               if (lotsRestriction != -1)
+               {
+                  downSideComment = downSideComment + "     Restriction initial lots: " + DoubleToStr(lotsRestriction, 2) + "\n";  
+                  restrictionPrice = GetLastHedgeClosePrice(magicHedge[0], OP_BUY, startSession[1]);
+                  restrictionTargerPrice = restrictionPrice - InitialRestrictionPips*Point;
+                  downSideComment = downSideComment + "     Restriction targer price for Bid: " + DoubleToStr(restrictionTargerPrice, Digits) + "\n";                                                      
+               }   
+            }                 
             break;   
       }   
       
@@ -1826,6 +1899,13 @@ void ShowStatistics()
 }
 //+------------------------------------------------------------------+
 
+//+------------------------------------------------------------------+
+void Notify(string text)
+{
+   if (ShowAlerts)
+      Alert(text);
+}
+//+------------------------------------------------------------------+
 
 
 //+------------------------------------------------------------------+
