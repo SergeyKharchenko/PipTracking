@@ -547,8 +547,7 @@ bool IsOpenFirstHedge(int side)
 	if (hedgeWasClosed[side] != -1)
 		return (false);
 	int hedgeSLMode = GetHedgeIndicatorLine(side);
-	if ((hedgeSLMode != -1) 
-		 && IsIndicatorsAllowHedge(side))
+	if ((hedgeSLMode != -1)  && IsIndicatorsAllowHedge(side))
 	{
       hedgeCapturedSl[side] = hedgeSLMode;
 		return (true);
@@ -566,12 +565,12 @@ bool IsInitialRestrictionOpen(int side)
 	switch (side)
 	{
 		case UP:
-			double lastHedgeClosePrice = GetLastHedgeClosePrice(magicHedge[0], OP_SELL, startSession[0]);
+			double lastHedgeClosePrice = GetLastHedgeOpenPrice(magicHedge[0], OP_SELL, startSession[0]);
 			if ((Ask > lastHedgeClosePrice) && !IsLastRestrictionOrderSameType(UP, OP_BUY, startSession[0]))
 				return (true);
 			break;
 		case DOWN:	
-			lastHedgeClosePrice = GetLastHedgeClosePrice(magicHedge[1], OP_BUY, startSession[1]);
+			lastHedgeClosePrice = GetLastHedgeOpenPrice(magicHedge[1], OP_BUY, startSession[1]);
 			if ((Bid < lastHedgeClosePrice) && !IsLastRestrictionOrderSameType(DOWN, OP_SELL, startSession[1]))
 				return (true);  				
 			break;			
@@ -590,15 +589,15 @@ bool IsHedgeRestrictionOpen(int side)
 	{
 		case UP:
 			double lastHedgeOpenPrice = GetLastHedgeOpenPrice(magicHedge[0], OP_SELL, startSession[0]);
-			if ((Bid < lastHedgeOpenPrice)
-				 && (Bid < GetHedgeSL(hedgeCapturedSl[0], -AdditionalHedgeReenterPips))
+			if ((Bid <= lastHedgeOpenPrice)
+				 && (Bid <= GetHedgeSL(hedgeCapturedSl[0], -AdditionalHedgeReenterPips))
 				 && IsIndicatorsAllowHedge(UP))
 				return (true);
 			break;
 		case DOWN:
 			lastHedgeOpenPrice = GetLastHedgeOpenPrice(magicHedge[1], OP_BUY, startSession[1]);
-			if ((Ask > lastHedgeOpenPrice)
-				 && (Ask > GetHedgeSL(hedgeCapturedSl[1], AdditionalHedgeReenterPips))
+			if ((Ask >= lastHedgeOpenPrice)
+				 && (Ask >= GetHedgeSL(hedgeCapturedSl[1], AdditionalHedgeReenterPips))
 				 && IsIndicatorsAllowHedge(DOWN))
 				return (true);			
 			break;			
@@ -910,9 +909,9 @@ bool IsOsMAAllowHedge(int side)
    switch (side)
    {
       case UP:
-         return (osma <= -OsMAHedgeValue);
+         return (osma >= OsMAHedgeValue);
       case DOWN:
-         return (osma >= OsMAHedgeValue);         
+         return (osma <= -OsMAHedgeValue);         
    }
    return (false);
 }
@@ -925,9 +924,9 @@ bool IsACAllowHedge(int side)
    switch (side)
    {
       case UP:
-         return (ac <= -ACHedgeValue);
+         return (ac >= ACHedgeValue);
       case DOWN:
-         return (ac >= ACHedgeValue);         
+         return (ac <= -ACHedgeValue);         
    }
    return (false);
 }
