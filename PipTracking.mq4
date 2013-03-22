@@ -924,9 +924,9 @@ bool IsACAllowHedge(int side)
    switch (side)
    {
       case UP:
-         return (ac >= ACHedgeValue);
+         return (ac <= -ACHedgeValue);
       case DOWN:
-         return (ac <= -ACHedgeValue);         
+         return (ac >= ACHedgeValue);         
    }
    return (false);
 }
