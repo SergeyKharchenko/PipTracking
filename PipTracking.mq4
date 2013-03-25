@@ -565,13 +565,13 @@ bool IsInitialRestrictionOpen(int side)
 	switch (side)
 	{
 		case UP:
-			double lastHedgeClosePrice = GetLastHedgeOpenPrice(magicHedge[0], OP_SELL, startSession[0]);
-			if ((Ask > lastHedgeClosePrice) && !IsLastRestrictionOrderSameType(UP, OP_BUY, startSession[0]))
+			double lastHedgeOpenPrice = GetLastHedgeOpenPrice(magicHedge[0], OP_SELL, startSession[0]);
+			if ((Ask > lastHedgeOpenPrice) && !IsLastRestrictionOrderSameType(UP, OP_BUY, startSession[0]) && IsIndicatorsAllowHedge(DOWN))
 				return (true);
 			break;
 		case DOWN:	
-			lastHedgeClosePrice = GetLastHedgeOpenPrice(magicHedge[1], OP_BUY, startSession[1]);
-			if ((Bid < lastHedgeClosePrice) && !IsLastRestrictionOrderSameType(DOWN, OP_SELL, startSession[1]))
+			lastHedgeOpenPrice = GetLastHedgeOpenPrice(magicHedge[1], OP_BUY, startSession[1]);
+			if ((Bid < lastHedgeOpenPrice) && !IsLastRestrictionOrderSameType(DOWN, OP_SELL, startSession[1]) && IsIndicatorsAllowHedge(UP))
 				return (true);  				
 			break;			
 	}
@@ -909,9 +909,9 @@ bool IsOsMAAllowHedge(int side)
    switch (side)
    {
       case UP:
-         return (osma >= OsMAHedgeValue);
+         return (osma <= -ACHedgeValue);
       case DOWN:
-         return (osma <= -OsMAHedgeValue);         
+         return (osma >= ACHedgeValue);        
    }
    return (false);
 }
