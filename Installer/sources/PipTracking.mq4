@@ -1356,17 +1356,6 @@ double GetLastHedgeOpenPrice(int magic, int type, datetime time)
 //+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
-double GetLastHedgeClosePrice(int magic, int type, datetime time)
-{
-   int ticket = GetLastOrderTicket(magic, type, MODE_HISTORY);
-	if (OrderSelect(ticket, SELECT_BY_TICKET)) 
-		if (OrderOpenTime() > time)
-			return (OrderClosePrice());
-   return (-1);
-}
-//+------------------------------------------------------------------+
-
-//+------------------------------------------------------------------+
 double GetLastOrderOpenPrice(int magic, int type)
 {    
    int ticket = GetLastOrderTicket(magic, type, MODE_TRADES);
@@ -1548,8 +1537,16 @@ double GetRestrictionLots(int side, int orderType, double targetPrice, double pe
          break;         
    } 
    
+   int moneyForOnePoint;
+   switch (Digits)
+   {
+      case 5: moneyForOnePoint = 1; break;
+      case 4: moneyForOnePoint = 10; break;
+      case 3: moneyForOnePoint = 100; break;
+   }   
+   
    double currentProfit = GetOrdersProfitBySide(side) + GetHedgeProfitFromHistory(side, startSession[side]); 
-   double tickSize = currentLots * 10;
+   double tickSize = currentLots * moneyForOnePoint;
    double distaceSize = tickSize * pipsDistance;
    double targetProfit = GetOrdersLotsBySide(side) * perLot;
    double targetProfitWithLoss = targetProfit - currentProfit;
@@ -1557,84 +1554,10 @@ double GetRestrictionLots(int side, int orderType, double targetPrice, double pe
    if (missingMoney < 0)
    {
       missingMoney *= -1;
-      double lotsAmount = missingMoney / (10 * pipsDistance);
+      double lotsAmount = missingMoney / (moneyForOnePoint * pipsDistance);
       return (lotsAmount);
    }
    return (-1);
-}
-//+------------------------------------------------------------------+
-
-//+------------------------------------------------------------------+
-double GetTotalProfitForRestriction(int side, double targetPrice)
-{
-   double profit = 0;
-   for (int i = 0; i < OrdersTotal(); i++)
-   {
-      if (!OrderSelect(i, SELECT_BY_POS))
-         continue;
-         
-      if (OrderSymbol() != Symbol()) continue;
-      if (side == UP)
-      {            
-         if ((OrderMagicNumber() != magicSimple[0]) 
-             && (OrderMagicNumber() != magicMultiple[0])
-             && (OrderMagicNumber() != magicHedge[0])
-             && (OrderMagicNumber() != magicRestriction[0]))
-            continue;   
-      }     
-      if (side == DOWN)
-      {
-         if ((OrderMagicNumber() != magicSimple[1]) 
-             && (OrderMagicNumber() != magicMultiple[1])
-             && (OrderMagicNumber() != magicHedge[1])
-             && (OrderMagicNumber() != magicRestriction[1]))
-            continue;   
-      }          
-         
-      double spread = 0;   
-      switch (side)
-      {
-         case UP:
-            if (OrderType() == OP_SELL)
-               spread = Ask - Bid;
-            break;
-         case DOWN:
-            if (OrderType() == OP_BUY)
-               spread = Bid - Ask;
-            break;            
-      }
-      
-      profit += GetOrderTargetProfitInCurrency(OrderTicket(), targetPrice + spread);      
-   }
-   
-   return (profit);
-}
-//+------------------------------------------------------------------+
-
-//+------------------------------------------------------------------+
-double GetOrderTargetProfitInCurrency(int ticket, double targetPrice)
-{
-   if (!OrderSelect(ticket, SELECT_BY_TICKET))
-      return (0);
-   double orderLots = OrderLots();   
-   double lotSize = MarketInfo(Symbol(), MODE_LOTSIZE);
-   double lotCost = orderLots * lotSize;
-   int orderType = OrderType();
-   double orderOpenPrice = OrderOpenPrice();
-   double priceDiff;
-   switch (orderType)
-   {
-      case OP_BUY:
-         priceDiff = targetPrice - orderOpenPrice;
-         break;      
-      case OP_SELL:
-         priceDiff = orderOpenPrice - targetPrice;
-         break;
-   }
-   
-   double orderProfit = lotCost * priceDiff;
-   
-   return(orderProfit);
 }
 //+------------------------------------------------------------------+
 
