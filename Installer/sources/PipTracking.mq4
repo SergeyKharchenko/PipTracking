@@ -131,7 +131,8 @@ int
    magicSimple[2],
    magicMultiple[2],
    magicHedge[2],
-   magicRestriction[2];
+   magicRestriction[2],
+   openTrades[2];
    
 bool 
    work = true,
@@ -446,7 +447,6 @@ void OpenOrders(int side)
 			magic = magicHedge[side];
 			if (state[side] == RESTRICTION_HEDGE) 
 				magic = magicRestriction[side]; 
-			   
 
 			orderType = oppositeOrderType;
 			orderOpenPrice = oppositeOrderOpenPrice;
@@ -455,8 +455,6 @@ void OpenOrders(int side)
 			break;		
 
 		case RESTRICTION_INITIAL:
-		   if (side == DOWN)
-		    debug = true;
 			magic = magicRestriction[side];
 			break; 
 	}
@@ -477,7 +475,7 @@ void OpenOrders(int side)
 //+------------------------------------------------------------------+
 int GetOpenState(int side)
 {
-	if (!OpenTrades)
+	if (!OpenTrades && (openTrades[side] == 0))
 		return (-1);
 		
 	if ((side == UP) && !UseUpSide)
@@ -707,6 +705,8 @@ bool ProcessBreakEven(int side)
 {
 	if ((state[side] == BREAK_EVEN) || IsBreakEven(side))
 	{
+	   if (!OpenTrades)
+	     openTrades[side] = 0;
 		state[side] = BREAK_EVEN;
 		GlobalTrailing(side);
 		return (true);
@@ -880,7 +880,9 @@ bool IsTakeProfitForSimpleState(int side)
       case UP:
          if (Bid >= (GetLastOrderOpenPrice(magicSimple[0], OP_BUY) + TakeProfit * Point))
          {
-            Notify("Take profit point has been reached by UP side");
+            Notify("Take profit point has been reached by UP side"); 
+            if (!OpenTrades)   
+               openTrades[UP] = 0;
             return (true);
          } 
          break;
@@ -889,6 +891,8 @@ bool IsTakeProfitForSimpleState(int side)
          if (Ask <= (GetLastOrderOpenPrice(magicSimple[1], OP_SELL) - TakeProfit * Point))
          {
             Notify("Take profit point has been reached by DOWN side");
+            if (!OpenTrades)
+               openTrades[DOWN] = 0;
             return (true);
          } 
          break;
@@ -1446,6 +1450,8 @@ void ShowCriticalAlertAndStop(string alertText)
 //+------------------------------------------------------------------+
 void ResetToDefault()
 {
+   openTrades[0] = 1;
+   openTrades[1] = 1;
 	startMoney[0] = -1;
 	startMoney[1] = -1;
 	startSession[0] = -1;
@@ -1485,12 +1491,14 @@ void LoadSession()
       startSession[0] = FileReadNumber(handle);
       hedgeWasClosed[0] = FileReadNumber(handle);   
       hedgeCapturedSl[0] = FileReadNumber(handle); 
+      openTrades[0] = FileReadNumber(handle); 
       
       state[1] = FileReadNumber(handle);
       startMoney[1] = FileReadNumber(handle);
       startSession[0] = FileReadNumber(handle);
       hedgeWasClosed[1] = FileReadNumber(handle); 
       hedgeCapturedSl[1] = FileReadNumber(handle); 
+      openTrades[1] = FileReadNumber(handle); 
       FileClose(handle);
    }
 }
@@ -1504,8 +1512,8 @@ void SaveSession()
    if(handle > 0)
    {
       FileWrite(handle, 
-               state[0], startMoney[0], startSession[0], hedgeWasClosed[0], hedgeCapturedSl[0],
-               state[1], startMoney[1], startSession[1], hedgeWasClosed[1], hedgeCapturedSl[1]);
+               state[0], startMoney[0], startSession[0], hedgeWasClosed[0], hedgeCapturedSl[0], openTrades[0],
+               state[1], startMoney[1], startSession[1], hedgeWasClosed[1], hedgeCapturedSl[1], openTrades[1]);
       FileClose(handle);
    }
 }
@@ -1762,7 +1770,6 @@ void ShowStatistics()
             if ((hedgeWasClosed[0] == 1) && !isHedgeOrderExist)
             {
                upSideComment = upSideComment + "     Hedge previous price: " + DoubleToStr(GetLastHedgeClosePrice(magicHedge[0], OP_SELL, startSession[0]), Digits) + "\n";                                        
-               upSideComment = upSideComment + "     Hedge indicator price: " + DoubleToStr(GetHedgeSL(hedgeCapturedSl[0], -AdditionalHedgeReenterPips), Digits) + "\n";                            
             }   
             if (isHedgeOrderExist)
                upSideComment = upSideComment + "     Hedge stop loss: " + DoubleToStr(GetLastHedgeOrderStopLoss(magicHedge[0], OP_SELL), Digits) + "\n";                                                                                        
@@ -1833,7 +1840,6 @@ void ShowStatistics()
             if ((hedgeWasClosed[1] == 1) && !isHedgeOrderExist)
             {                                       
                downSideComment = downSideComment + "     Hedge previous price: " + DoubleToStr(GetLastHedgeClosePrice(magicHedge[1], OP_BUY, startSession[1]), Digits) + "\n";
-               downSideComment = downSideComment + "     Hedge indicator price: " + DoubleToStr(GetHedgeSL(hedgeCapturedSl[1], AdditionalHedgeReenterPips), Digits) + "\n";
             }   
             if (isHedgeOrderExist)
                downSideComment = downSideComment + "     Hedge stop loss: " + DoubleToStr(GetLastHedgeOrderStopLoss(magicHedge[1], OP_BUY), Digits) + "\n";                     
