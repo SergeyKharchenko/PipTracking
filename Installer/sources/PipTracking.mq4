@@ -446,10 +446,7 @@ void OpenOrders(int side)
 			sl = CastSLToPoints(slValue, oppositeOrderType);      
 			magic = magicHedge[side];
 			if (state[side] == RESTRICTION_HEDGE) 
-			{
 				magic = magicRestriction[side]; 
-				debug = true;
-			}	
 
 			orderType = oppositeOrderType;
 			orderOpenPrice = oppositeOrderOpenPrice;
