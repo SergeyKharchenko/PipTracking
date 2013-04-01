@@ -446,7 +446,10 @@ void OpenOrders(int side)
 			sl = CastSLToPoints(slValue, oppositeOrderType);      
 			magic = magicHedge[side];
 			if (state[side] == RESTRICTION_HEDGE) 
+			{
 				magic = magicRestriction[side]; 
+				debug = true;
+			}	
 
 			orderType = oppositeOrderType;
 			orderOpenPrice = oppositeOrderOpenPrice;
@@ -632,7 +635,7 @@ double CalculateLotByState(int side, int newState)
          sameOrderType = OP_BUY;
          hedgeOrderType = OP_SELL;         
 			orderTargetPriceForInitial = Ask + InitialRestrictionPips*Point + (Ask - Bid);
-			orderTargetPriceForHedge = GetLastHedgeOpenPrice(magicHedge[UP], OP_SELL, startSession[UP]) - HedgeRestrictionPips*Point;
+			orderTargetPriceForHedge = Ask - HedgeRestrictionPips*Point;
 			break;
       case DOWN:
          sameOrderType = OP_SELL;
@@ -1546,7 +1549,7 @@ double GetRestrictionLots(int side, int orderType, double targetPrice, double pe
                currentLots = GetOrdersLots(UP, OP_BUY) - GetOrdersLots(UP, OP_SELL);
                break;
             case DOWN:
-               currentLots = GetOrdersLots(UP, OP_SELL) - GetOrdersLots(UP, OP_BUY);
+               currentLots = GetOrdersLots(DOWN, OP_BUY) - GetOrdersLots(DOWN, OP_SELL);
                break;
          }
          break;
@@ -1555,7 +1558,7 @@ double GetRestrictionLots(int side, int orderType, double targetPrice, double pe
          switch (side)
          {
             case UP:
-               currentLots = GetOrdersLots(DOWN, OP_BUY) - GetOrdersLots(DOWN, OP_SELL);
+               currentLots = GetOrdersLots(UP, OP_BUY) - GetOrdersLots(UP, OP_SELL);
                break;
             case DOWN:
                currentLots = GetOrdersLots(DOWN, OP_SELL) - GetOrdersLots(DOWN, OP_BUY);
