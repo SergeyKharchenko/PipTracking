@@ -703,11 +703,14 @@ void ProcessHedgeOrders(int side)
 //+------------------------------------------------------------------+
 bool ProcessBreakEven(int side)
 {
-	if ((state[side] == BREAK_EVEN) || IsBreakEven(side))
+   if (state[side] != BREAK_EVEN)
+      if (IsBreakEven(side))
+         state[side] = BREAK_EVEN;
+   
+	if (state[side] == BREAK_EVEN)
 	{
 	   if (!OpenTrades)
 	     openTrades[side] = 0;
-		state[side] = BREAK_EVEN;
 		GlobalTrailing(side);
 		return (true);
 	}
@@ -799,7 +802,7 @@ bool IsBreakEven(int side)
          
                if (currentTotalProfit >= neededProfit)
                {
-                  Notify("Break even by profit per lot has triggered by UP side");
+                  Notify("Break even by profit per lot has triggered by DOWN side");
                   return (true);
                } 
                break;   
