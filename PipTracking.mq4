@@ -312,7 +312,7 @@ int start()
 		work = false;
 		Alert("EA is blocking");
 		return;
-   } 
+   }       
       
 	bool isCriticalLossUp = IsCriticalLoss(UP);
 	bool isCriticalLossDown = IsCriticalLoss(DOWN);
@@ -372,7 +372,7 @@ void OpenOrders(int side)
 {
 	int newState = GetOpenState(side);
 	if (newState == -1)
-		return;		
+		return;			
 	
 	double lot = CalculateLotByState(side, newState);  
 	if (lot == -1) 
@@ -446,7 +446,9 @@ void OpenOrders(int side)
 			sl = CastSLToPoints(slValue, oppositeOrderType);      
 			magic = magicHedge[side];
 			if (state[side] == RESTRICTION_HEDGE) 
-				magic = magicRestriction[side]; 
+			{	
+			   magic = magicRestriction[side]; 
+			}
 
 			orderType = oppositeOrderType;
 			orderOpenPrice = oppositeOrderOpenPrice;
@@ -560,20 +562,20 @@ bool IsOpenFirstHedge(int side)
 
 //+------------------------------------------------------------------+
 bool IsInitialRestrictionOpen(int side)
-{		
+{	
 	if (hedgeWasClosed[side] != 1)			
 		return (false);
 		
 	switch (side)
 	{
 		case UP:
-			double lastHedgeOpenPrice = GetLastHedgeClosePrice(magicHedge[0], OP_SELL, startSession[0]);
-			if ((Ask > lastHedgeOpenPrice) && !IsLastRestrictionOrderSameType(UP, OP_BUY, startSession[0]) && IsIndicatorsAllowHedge(DOWN))
+			double lastHedgeClosePrice = GetLastHedgeClosePrice(magicHedge[0], OP_SELL, startSession[0]);
+			if ((Ask > lastHedgeClosePrice) && !IsLastRestrictionOrderSameType(UP, OP_BUY, startSession[0]) && IsIndicatorsAllowHedge(DOWN))
 				return (true);
 			break;
 		case DOWN:	
-			lastHedgeOpenPrice = GetLastHedgeClosePrice(magicHedge[1], OP_BUY, startSession[1]);
-			if ((Bid < lastHedgeOpenPrice) && !IsLastRestrictionOrderSameType(DOWN, OP_SELL, startSession[1]) && IsIndicatorsAllowHedge(UP))
+			lastHedgeClosePrice = GetLastHedgeClosePrice(magicHedge[1], OP_BUY, startSession[1]);
+			if ((Bid < lastHedgeClosePrice) && !IsLastRestrictionOrderSameType(DOWN, OP_SELL, startSession[1]) && IsIndicatorsAllowHedge(UP))
 				return (true);  				
 			break;			
 	}
@@ -631,13 +633,13 @@ double CalculateLotByState(int side, int newState)
       case UP:
          sameOrderType = OP_BUY;
          hedgeOrderType = OP_SELL;         
-			orderTargetPriceForInitial = Ask + InitialRestrictionPips*Point + (Ask - Bid);
+			orderTargetPriceForInitial = Ask + InitialRestrictionPips*Point - (Ask - Bid);
 			orderTargetPriceForHedge = Ask - HedgeRestrictionPips*Point;
 			break;
       case DOWN:
          sameOrderType = OP_SELL;
          hedgeOrderType = OP_BUY;
-			orderTargetPriceForInitial = Bid - InitialRestrictionPips*Point - (Ask - Bid);
+			orderTargetPriceForInitial = Bid - InitialRestrictionPips*Point + (Ask - Bid);
 			orderTargetPriceForHedge = Bid + HedgeRestrictionPips*Point;
 			break;
    } 		
@@ -1246,11 +1248,10 @@ double GetOrdersProfitBySide(int side)
                 && (OrderMagicNumber() != magicHedge[1])
                 && (OrderMagicNumber() != magicRestriction[1]))
                continue;   
-         }                                   
+         }                                 
          profit += OrderProfit();
       }
    }
-         
    return (profit);
 }
 //+------------------------------------------------------------------+
@@ -1413,26 +1414,79 @@ double GetLastOrderLots(int magic, int type)
 
 //+------------------------------------------------------------------+
 bool IsLastRestrictionOrderSameType(int side, int orderType, datetime time)
-{	
+{	   
+   int maxOpenDate = 0;
+   bool same = false;
+
    for (int i = OrdersTotal() - 1; i >= 0; i--)
    {
       if (!OrderSelect(i, SELECT_BY_POS))
          continue;
-			
+      if (OrderSymbol() != Symbol())   
+         continue;
+      if (OrderOpenTime() < time)
+	      break;      	      	      
+	      
       switch (side)
       {
          case UP:
-            if (OrderMagicNumber() != magicRestriction[0]) continue; 
+            if (OrderMagicNumber() == magicRestriction[UP]) 
+            {
+               if (maxOpenDate < OrderOpenTime())
+               {
+                  maxOpenDate = OrderOpenTime();
+                  same = (orderType == OrderType());
+               }
+            }
             break;
          case DOWN:
-            if (OrderMagicNumber() != magicRestriction[1]) continue; 
+            if (OrderMagicNumber() != magicRestriction[DOWN]) 
+            {
+               if (maxOpenDate < OrderOpenTime())
+               {
+                  maxOpenDate = OrderOpenTime();
+                  same = (orderType == OrderType());
+               }
+            }
             break;         
-      }
-                                   
-      if ((OrderOpenTime() < time) || (time == -1)) continue;
-      return (OrderType() == orderType);
+      }               
    }
-   return (false);
+   
+   for (i = OrdersHistoryTotal() - 1; i >= 0; i--)
+   {
+      if (!OrderSelect(i, SELECT_BY_POS, MODE_HISTORY))
+         continue;
+      if (OrderSymbol() != Symbol())   
+         continue;
+      if (OrderOpenTime() < time)
+	      break;      	      	      
+	      
+      switch (side)
+      {
+         case UP:
+            if (OrderMagicNumber() == magicRestriction[UP]) 
+            {
+               if (maxOpenDate < OrderOpenTime())
+               {
+                  maxOpenDate = OrderOpenTime();
+                  same = (orderType == OrderType());
+               }
+            }
+            break;
+         case DOWN:
+            if (OrderMagicNumber() != magicRestriction[DOWN]) 
+            {
+               if (maxOpenDate < OrderOpenTime())
+               {
+                  maxOpenDate = OrderOpenTime();
+                  same = (orderType == OrderType());
+               }
+            }
+            break;         
+      }               
+   }
+   
+   return (same);
 } 
 //+------------------------------------------------------------------+ 
 
@@ -1456,7 +1510,6 @@ string SideToString(int side)
 //+------------------------------------------------------------------+
 void ShowCriticalAlertAndStop(string alertText)
 {
-   Alert(alertText);
    work = false;
 }
 //+------------------------------------------------------------------+
@@ -1580,15 +1633,17 @@ double GetRestrictionLots(int side, int orderType, double targetPrice, double pe
    
    double currentProfit = GetOrdersProfitBySide(side) + GetHedgeProfitFromHistory(side, startSession[side]); 
    double tickSize = currentLots * moneyForOnePoint;
+   if (orderType != side)
+      tickSize *= -1;
    double distaceSize = tickSize * pipsDistance;
    double targetProfit = GetOrdersLotsBySide(side) * perLot;
    double targetProfitWithLoss = targetProfit - currentProfit;
-   double missingMoney = distaceSize - targetProfitWithLoss;
+   double missingMoney = distaceSize - targetProfitWithLoss;          
            
    if (missingMoney < 0)
    {
       missingMoney *= -1;
-      double lotsAmount = missingMoney / (moneyForOnePoint * pipsDistance); 
+      double lotsAmount = missingMoney / (moneyForOnePoint * pipsDistance);                                        
       return (lotsAmount);
    }
    return (-1);
