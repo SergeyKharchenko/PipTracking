@@ -1,10 +1,10 @@
 [Setup]
 
 ;TODO Put the application name here:
-#define ApplicationName "PipTracking v1.16"
+#define ApplicationName "PipTracking v1.19"
 
-AppName    = PipTracking v1.16
-AppVersion = 1.16
+AppName    = PipTracking v1.19
+AppVersion = 1.19
 
 WizardImageFile      = sources\img\LeftIn.bmp
 WizardSmallImageFile = sources\img\Top.bmp
@@ -23,7 +23,7 @@ DefaultGroupName = {#ApplicationName}
 ;TODO Directory where installer file will be generated
 OutputDir          = output
 ;TODO Name of installer file
-OutputBaseFilename = PipTracking v1.16
+OutputBaseFilename = PipTracking v1.19
 
 Uninstallable      = yes
 
@@ -43,8 +43,8 @@ UninstallDisplayIcon = {app}\icons\Uninstall 32_32.ico
 
 ;TODO Output directories and names for above files inside MetaTrader directory
 #dim outFiles[filesTotal]
-#define outFiles[0] "experts\PipTracking v1.16.mq4"
-#define outFiles[1] "experts\PipTracking v1.16.ex4"
+#define outFiles[0] "experts\PipTracking v1.19.mq4"
+#define outFiles[1] "experts\PipTracking v1.19.ex4"
 
 ;TODO Add or remove needed lines here is files number changes
 Source: "{#inFiles[0]}"; DestDir: "{tmp}"; Flags: dontcopy

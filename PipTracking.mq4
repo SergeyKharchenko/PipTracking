@@ -477,6 +477,8 @@ void OpenOrders(int side)
 //+------------------------------------------------------------------+
 int GetOpenState(int side)
 {
+   if (OpenTrades)
+      openTrades[side] = 1;
 	if (!OpenTrades && (openTrades[side] == 0))
 		return (-1);
 		
@@ -1510,6 +1512,7 @@ string SideToString(int side)
 //+------------------------------------------------------------------+
 void ShowCriticalAlertAndStop(string alertText)
 {
+   Alert(alertText);
    work = false;
 }
 //+------------------------------------------------------------------+
@@ -1611,7 +1614,7 @@ double GetRestrictionLots(int side, int orderType, double targetPrice, double pe
          switch (side)
          {
             case UP:
-               currentLots = GetOrdersLots(UP, OP_BUY) - GetOrdersLots(UP, OP_SELL);
+               currentLots = GetOrdersLots(UP, OP_SELL) - GetOrdersLots(UP, OP_BUY);
                break;
             case DOWN:
                currentLots = GetOrdersLots(DOWN, OP_SELL) - GetOrdersLots(DOWN, OP_BUY);
@@ -1965,7 +1968,6 @@ void ShowStatistics()
            "     Current total profit: " + DoubleToStr(currentTotalProfitDown, 2) + " $\n" +              
            downSideComment;
    }
-   
    Comment(comment); 
    while(debug);
 }
