@@ -1605,7 +1605,7 @@ double GetRestrictionLots(int side, int orderType, double targetPrice, double pe
                currentLots = GetOrdersLots(UP, OP_BUY) - GetOrdersLots(UP, OP_SELL);
                break;
             case DOWN:
-               currentLots = GetOrdersLots(DOWN, OP_BUY) - GetOrdersLots(DOWN, OP_SELL);
+               currentLots = GetOrdersLots(DOWN, OP_SELL) - GetOrdersLots(DOWN, OP_BUY);
                break;
          }
          break;
@@ -1614,7 +1614,7 @@ double GetRestrictionLots(int side, int orderType, double targetPrice, double pe
          switch (side)
          {
             case UP:
-               currentLots = GetOrdersLots(UP, OP_SELL) - GetOrdersLots(UP, OP_BUY);
+               currentLots = GetOrdersLots(UP, OP_BUY) - GetOrdersLots(UP, OP_SELL);
                break;
             case DOWN:
                currentLots = GetOrdersLots(DOWN, OP_SELL) - GetOrdersLots(DOWN, OP_BUY);
