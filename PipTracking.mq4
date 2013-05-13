@@ -23,14 +23,18 @@ extern string    StrategySettings = "-------------------------------------------
 extern bool      UseUpSide        = true;
 extern bool      UseDownSide      = true;
 
-extern int       PipStep          = 25;
-extern double    LotSize          = 0.1;
-extern double    ProfitPerLot     = 30;
-extern int       TakeProfit       = 20;
-extern double    LotExponent      = 1.5;
-extern double    LotHedgeExponent = 2.5;
-extern double    UnrealizedLoss   = 15;
-extern double    CriticalLoss     = 50;
+extern int       PipStep           = 25;
+extern double    LotSize           = 0.1;
+extern double    ProfitPerLot      = 30;
+extern int       TakeProfit        = 20;
+extern double    LotExponent       = 1.5;
+extern double    LotHedgeExponent  = 2.5;
+extern bool      UseUnrealizedLoss = true;
+extern double    UnrealizedLoss    = 15;
+extern bool      UseUnrealizedPips = true;
+extern double    UnrealizedPips    = 150;
+extern bool      UseCriticalLoss   = true;
+extern double    CriticalLoss      = 50;
 
 extern string    RestrictionSettings       = "------------------------------------------------";
 extern int       InitialRestrictionPips    = 10;
@@ -116,12 +120,6 @@ extern bool      DisableEA          = false;
 #define BREAK_EVEN        	  5
 
 
-// --> Global sides
-#define UP     0
-#define DOWN   1
-// 
-
-
 // --> Global variables
 int
    ticket,
@@ -142,14 +140,15 @@ bool
    
 double
    startLot,
-   startMoney[2];   
+   startSessionMoney[2],
+   startSessionPrice[2];   
    
 string 
    errorStr,
    saveFileName;        
     
 datetime
-   startSession[2];
+   startSessionTime[2];
     
 // <--
 //+------------------------------------------------------------------+
@@ -166,6 +165,7 @@ int init()
 	  AdditionalHedgeReenterPips *= 10;
 	  InitialRestrictionPips *= 10;
 	  HedgeRestrictionPips *= 10;
+	  UnrealizedPips *= 10;
    }
 
    if (MagicNumber <= 0) 
@@ -183,8 +183,14 @@ int init()
    if (PipStep < 1) 
 		ShowCriticalAlertAndStop("PipStep is invalid");
    
+   if (!UseUnrealizedLoss && !UseUnrealizedPips) 
+      ShowCriticalAlertAndStop("UseUnrealizedLoss or UseUnrealizedPips should be true");
+   
    if (UnrealizedLoss <= 0) 
 		ShowCriticalAlertAndStop("UnrealizedLoss is invalid");
+   
+   if (UnrealizedPips <= 0) 
+		ShowCriticalAlertAndStop("UnrealizedPips is invalid");
    
    if ((UpHedgeStopLossLine < 0) || (UpHedgeStopLossLine > 3)) 
 		ShowCriticalAlertAndStop("UpHedgeStopLossLine is invalid");
@@ -314,8 +320,8 @@ int start()
 		return;
    }       
       
-	bool isCriticalLossUp = IsCriticalLoss(UP);
-	bool isCriticalLossDown = IsCriticalLoss(DOWN);
+	bool isCriticalLossUp = IsCriticalLoss(OP_BUY);
+	bool isCriticalLossDown = IsCriticalLoss(OP_SELL);
 	if (isCriticalLossUp || isCriticalLossDown)
 	{
 		if (isCriticalLossUp)
@@ -329,30 +335,30 @@ int start()
 
 	SaveSession();
 	 
-	if (GetOrdersCountBySide(UP) == 0)
+	if (GetOrdersCountBySide(OP_BUY) == 0)
 		state[0] = NONE;        
 
-	ProcessHedgeOrders(UP);
+	ProcessHedgeOrders(OP_BUY);
 	 
-	if (!ProcessBreakEven(UP))
+	if (!ProcessBreakEven(OP_BUY))
 	{   
-		if (IsTakeProfitForSimpleState(UP))
+		if (IsTakeProfitForSimpleState(OP_BUY))
 			TryClose(magicSimple[0], OP_BUY);
 			
-		OpenOrders(UP);		
+		OpenOrders(OP_BUY);		
 	}
 	
-	if (GetOrdersCountBySide(DOWN) == 0)
+	if (GetOrdersCountBySide(OP_SELL) == 0)
 		state[1] = NONE;
 
-	ProcessHedgeOrders(DOWN);
+	ProcessHedgeOrders(OP_SELL);
 
-	if (!ProcessBreakEven(DOWN))
+	if (!ProcessBreakEven(OP_SELL))
 	{            
-		if (IsTakeProfitForSimpleState(DOWN))
+		if (IsTakeProfitForSimpleState(OP_SELL))
 			TryClose(magicSimple[1], OP_SELL);
 
-		OpenOrders(DOWN);
+		OpenOrders(OP_SELL);
 	}
    
    if (ShowComments)
@@ -399,7 +405,7 @@ void OpenOrders(int side)
 		
 	switch (side)
 	{
-		case UP: 
+		case OP_BUY: 
 			sameOrderColor = Lime;
 			oppositeOrderColor = Red;
 			sameOrderType = OP_BUY;
@@ -407,7 +413,7 @@ void OpenOrders(int side)
 			sameOrderOpenPrice = Ask;
 			oppositeOrderOpenPrice = Bid;
 			break;
-		case DOWN: 
+		case OP_SELL: 
 			sameOrderColor = Red;
 			oppositeOrderColor = Lime;
 			sameOrderType = OP_SELL;
@@ -427,8 +433,9 @@ void OpenOrders(int side)
 	switch (newState)
 	{
 		case SIMPLE: 		 
-			startMoney[side] = AccountBalance();  
-			startSession[side] = TimeCurrent();
+			startSessionMoney[side] = AccountBalance();  
+			startSessionTime[side] = TimeCurrent();
+			startSessionPrice[side] = sameOrderOpenPrice;
 			hedgeWasClosed[side] = -1;
 			magic = magicSimple[side];
 			break;
@@ -438,27 +445,27 @@ void OpenOrders(int side)
 			break;
 			
 		case HEDGE:
+		   magic = magicHedge[side]; 
+		   lot = MathMax(lot, CalculateLotByState(side, RESTRICTION_HEDGE));
+		   break; 
+		   
 		case RESTRICTION_HEDGE:
-			if (lot == -1) 
-				break;
-			hedgeWasClosed[side] = 0;
-			double slValue = GetHedgeSL(hedgeCapturedSl[side], AdditionalHedgeStopLossPips);
-			sl = CastSLToPoints(slValue, oppositeOrderType);      
-			magic = magicHedge[side];
-			if (state[side] == RESTRICTION_HEDGE) 
-			{	
-			   magic = magicRestriction[side]; 
-			}
-
-			orderType = oppositeOrderType;
-			orderOpenPrice = oppositeOrderOpenPrice;
-			orderColor = oppositeOrderColor;
-			
+			magic = magicRestriction[side]; 					
 			break;		
 
 		case RESTRICTION_INITIAL:
 			magic = magicRestriction[side];
 			break; 
+	}
+	
+	if ((newState == HEDGE) || (newState == RESTRICTION_HEDGE))
+	{
+		hedgeWasClosed[side] = 0;
+		double slValue = GetHedgeSL(hedgeCapturedSl[side], AdditionalHedgeStopLossPips);
+		sl = CastSLToPoints(slValue, oppositeOrderType);      
+		orderType = oppositeOrderType;
+		orderOpenPrice = oppositeOrderOpenPrice;
+		orderColor = oppositeOrderColor;
 	}
 	
 	ticket = OpenOrderA(Symbol(), orderType, lot, orderOpenPrice, sl, 0, 100, NULL, magic, 5, 0, orderColor);  
@@ -482,10 +489,10 @@ int GetOpenState(int side)
 	if (!OpenTrades && (openTrades[side] == 0))
 		return (-1);
 		
-	if ((side == UP) && !UseUpSide)
+	if ((side == OP_BUY) && !UseUpSide)
 	  return (-1);
 	  
-	if ((side == DOWN) && !UseDownSide)
+	if ((side == OP_SELL) && !UseDownSide)
 	  return (-1);
 		
    RefreshRates();
@@ -499,10 +506,10 @@ int GetOpenState(int side)
 	if (IsOpenFirstHedge(side))
 		return (HEDGE);	
 	
-	if (IsInitialRestrictionOpen(side))
+	if (IsOpenInitialRestriction(side))
 		return (RESTRICTION_INITIAL);		
 	
-	if (IsHedgeRestrictionOpen(side))
+	if (IsOpenHedgeRestriction(side))
 	   return (RESTRICTION_HEDGE);	
 	
    return (-1);
@@ -523,7 +530,7 @@ bool IsOpenMultiple(int side)
 		return (false);
 	switch (side)
 	{
-		case UP:
+		case OP_BUY:
 			if (hedgeWasClosed[0] != -1)
 				return (false);
 				double lastOrderOpenPrice = MathMinBlocked(GetLastOrderOpenPrice(magicSimple[0], OP_BUY),
@@ -531,7 +538,7 @@ bool IsOpenMultiple(int side)
 				if (((Ask + PipStep * Point) <= lastOrderOpenPrice) && (lastOrderOpenPrice != -1))
 					return (true);  
 			break;
-		case DOWN:
+		case OP_SELL:
 			if (hedgeWasClosed[1] != -1)
 				return (false);		
 				lastOrderOpenPrice = MathMax(GetLastOrderOpenPrice(magicSimple[1], OP_SELL),
@@ -547,8 +554,9 @@ bool IsOpenMultiple(int side)
 //+------------------------------------------------------------------+
 bool IsOpenFirstHedge(int side)
 {
-	if (!IsUnrealizedLoss(side))
-		return (false);
+	if (!IsUnrealizedLoss(side) || !IsUnrealizedPips(side))
+		return (false);				
+		
 	if (hedgeWasClosed[side] != -1)
 		return (false);
 	int hedgeSLMode = GetHedgeIndicatorLine(side);
@@ -563,21 +571,21 @@ bool IsOpenFirstHedge(int side)
 //+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
-bool IsInitialRestrictionOpen(int side)
+bool IsOpenInitialRestriction(int side)
 {	
 	if (hedgeWasClosed[side] != 1)			
 		return (false);
 		
 	switch (side)
 	{
-		case UP:
-			double lastHedgeClosePrice = GetLastHedgeClosePrice(magicHedge[0], OP_SELL, startSession[0]);
-			if ((Ask > lastHedgeClosePrice) && !IsLastRestrictionOrderSameType(UP, OP_BUY, startSession[0]) && IsIndicatorsAllowHedge(DOWN))
+		case OP_BUY:
+			double lastHedgeClosePrice = GetLastHedgeClosePrice(magicHedge[0], OP_SELL, startSessionTime[0]);
+			if ((Ask > lastHedgeClosePrice) && !IsLastRestrictionOrderSameType(OP_BUY, OP_BUY, startSessionTime[0]) && IsIndicatorsAllowHedge(OP_SELL))
 				return (true);
 			break;
-		case DOWN:	
-			lastHedgeClosePrice = GetLastHedgeClosePrice(magicHedge[1], OP_BUY, startSession[1]);
-			if ((Bid < lastHedgeClosePrice) && !IsLastRestrictionOrderSameType(DOWN, OP_SELL, startSession[1]) && IsIndicatorsAllowHedge(UP))
+		case OP_SELL:	
+			lastHedgeClosePrice = GetLastHedgeClosePrice(magicHedge[1], OP_BUY, startSessionTime[1]);
+			if ((Bid < lastHedgeClosePrice) && !IsLastRestrictionOrderSameType(OP_SELL, OP_SELL, startSessionTime[1]) && IsIndicatorsAllowHedge(OP_BUY))
 				return (true);  				
 			break;			
 	}
@@ -586,25 +594,25 @@ bool IsInitialRestrictionOpen(int side)
 //+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
-bool IsHedgeRestrictionOpen(int side)
+bool IsOpenHedgeRestriction(int side)
 {
 	if (hedgeWasClosed[side] != 1)
 		return (false);
 		
 	switch (side)
 	{
-		case UP:
-			double lastHedgeOpenPrice = GetLastHedgeOpenPrice(magicHedge[0], OP_SELL, startSession[0]);
+		case OP_BUY:
+			double lastHedgeOpenPrice = GetLastHedgeOpenPrice(magicHedge[0], OP_SELL, startSessionTime[0]);
 			if ((Bid <= lastHedgeOpenPrice)
 				 && (Bid <= GetHedgeSL(hedgeCapturedSl[0], -AdditionalHedgeReenterPips))
-				 && IsIndicatorsAllowHedge(UP))
+				 && IsIndicatorsAllowHedge(OP_BUY))
 				return (true);
 			break;
-		case DOWN:
-			lastHedgeOpenPrice = GetLastHedgeOpenPrice(magicHedge[1], OP_BUY, startSession[1]);
+		case OP_SELL:
+			lastHedgeOpenPrice = GetLastHedgeOpenPrice(magicHedge[1], OP_BUY, startSessionTime[1]);
 			if ((Ask >= lastHedgeOpenPrice)
 				 && (Ask >= GetHedgeSL(hedgeCapturedSl[1], AdditionalHedgeReenterPips))
-				 && IsIndicatorsAllowHedge(DOWN))
+				 && IsIndicatorsAllowHedge(OP_SELL))
 				return (true);			
 			break;			
 	}
@@ -632,13 +640,13 @@ double CalculateLotByState(int side, int newState)
 		
    switch (side)
    {
-      case UP:
+      case OP_BUY:
          sameOrderType = OP_BUY;
          hedgeOrderType = OP_SELL;         
 			orderTargetPriceForInitial = Ask + InitialRestrictionPips*Point - (Ask - Bid);
 			orderTargetPriceForHedge = Ask - HedgeRestrictionPips*Point;
 			break;
-      case DOWN:
+      case OP_SELL:
          sameOrderType = OP_SELL;
          hedgeOrderType = OP_BUY;
 			orderTargetPriceForInitial = Bid - InitialRestrictionPips*Point + (Ask - Bid);
@@ -677,10 +685,10 @@ void ProcessHedgeOrders(int side)
 	int orderType;
 	switch (side)
 	{
-		case UP: 
+		case OP_BUY: 
 			orderType = OP_SELL; 
 			break;
-		case DOWN: 
+		case OP_SELL: 
 			orderType = OP_BUY; 
 			break;
 	}
@@ -731,8 +739,8 @@ bool IsBreakEven(int side)
       
    switch (side)
    {
-      case UP:
-         switch (GetOrdersCountBySide(UP))
+      case OP_BUY:
+         switch (GetOrdersCountBySide(OP_BUY))
          {
             case 0: 
             case 1: 
@@ -744,7 +752,7 @@ bool IsBreakEven(int side)
                   double restrictionPrice = GetLastOrderOpenPrice(magicRestriction[0], OP_SELL);
                   if (Bid <= (restrictionPrice - HedgeRestrictionPips*Point))
                   {
-                     Notify("Break even by hedge restriction pips has been triggered by UP side");
+                     Notify("Break even by hedge restriction pips has been triggered by OP_BUY side");
                      return (true);
                   }   
                }
@@ -754,27 +762,27 @@ bool IsBreakEven(int side)
                   restrictionPrice = GetLastOrderOpenPrice(magicRestriction[0], OP_BUY);
                   if (Ask >= (restrictionPrice + InitialRestrictionPips*Point))
                   {
-                     Notify("Break even by initial restriction pips has been triggered by UP side");
+                     Notify("Break even by initial restriction pips has been triggered by OP_BUY side");
                      return (true);
                   } 
                }                 
                
                double 
-                  previousProfit = GetHedgeProfitFromHistory(UP, startSession[0]),             
+                  previousProfit = GetHedgeProfitFromHistory(OP_BUY, startSessionTime[0]),             
                   neededProfit = lots * ProfitPerLot,       
                   currentTotalProfit = currentProfit + previousProfit; 
             
                if (currentTotalProfit >= neededProfit)
                {
-                  Notify("Break even by profit per lot has triggered by UP side");
+                  Notify("Break even by profit per lot has triggered by OP_BUY side");
                   return (true);
                } 
                break;
          }
          break;
          
-      case DOWN:
-         switch (GetOrdersCountBySide(DOWN))         
+      case OP_SELL:
+         switch (GetOrdersCountBySide(OP_SELL))         
          {
             case 0: 
             case 1: 
@@ -785,7 +793,7 @@ bool IsBreakEven(int side)
                   restrictionPrice = GetLastOrderOpenPrice(magicRestriction[1], OP_BUY);
                   if (Ask >= (restrictionPrice + HedgeRestrictionPips*Point))
                   {
-                     Notify("Break even by hedge restriction pips has been triggered by DOWN side");
+                     Notify("Break even by hedge restriction pips has been triggered by OP_SELL side");
                      return (true);
                   } 
                }        
@@ -795,18 +803,18 @@ bool IsBreakEven(int side)
                   restrictionPrice = GetLastOrderOpenPrice(magicRestriction[1], OP_SELL);
                   if (Bid <= (restrictionPrice - InitialRestrictionPips*Point))
                   {
-                     Notify("Break even by initial restriction pips has been triggered by DOWN side");
+                     Notify("Break even by initial restriction pips has been triggered by OP_SELL side");
                      return (true);
                   } 
                }                
                
-               previousProfit = GetHedgeProfitFromHistory(DOWN, startSession[1]);               
+               previousProfit = GetHedgeProfitFromHistory(OP_SELL, startSessionTime[1]);               
                neededProfit = lots * ProfitPerLot;         
                currentTotalProfit = currentProfit + previousProfit;
          
                if (currentTotalProfit >= neededProfit)
                {
-                  Notify("Break even by profit per lot has triggered by DOWN side");
+                  Notify("Break even by profit per lot has triggered by OP_SELL side");
                   return (true);
                } 
                break;   
@@ -828,7 +836,7 @@ void GlobalTrailing(int side, int attempts = 10)
       {
          if (OrderSymbol() != Symbol())
             continue;      
-         if (side == UP)
+         if (side == OP_BUY)
          {
             if ((OrderMagicNumber() != magicSimple[0]) 
                 && (OrderMagicNumber() != magicMultiple[0])
@@ -836,7 +844,7 @@ void GlobalTrailing(int side, int attempts = 10)
                 && (OrderMagicNumber() != magicRestriction[0]))
                continue;   
          }     
-         if (side == DOWN)
+         if (side == OP_SELL)
          {
             if ((OrderMagicNumber() != magicSimple[1]) 
                 && (OrderMagicNumber() != magicMultiple[1])
@@ -884,22 +892,22 @@ bool IsTakeProfitForSimpleState(int side)
       
    switch (side)
    {
-      case UP:
+      case OP_BUY:
          if (Bid >= (GetLastOrderOpenPrice(magicSimple[0], OP_BUY) + TakeProfit * Point))
          {
-            Notify("Take profit point has been reached by UP side"); 
+            Notify("Take profit point has been reached by OP_BUY side"); 
             if (!OpenTrades)   
-               openTrades[UP] = 0;
+               openTrades[OP_BUY] = 0;
             return (true);
          } 
          break;
          
-      case DOWN:
+      case OP_SELL:
          if (Ask <= (GetLastOrderOpenPrice(magicSimple[1], OP_SELL) - TakeProfit * Point))
          {
-            Notify("Take profit point has been reached by DOWN side");
+            Notify("Take profit point has been reached by OP_SELL side");
             if (!OpenTrades)
-               openTrades[DOWN] = 0;
+               openTrades[OP_SELL] = 0;
             return (true);
          } 
          break;
@@ -925,9 +933,9 @@ bool IsOsMAAllowHedge(int side)
    double osma = iOsMA(Symbol(), OsMATimeframe, OsMAFastEMA, OsMASlowEMA, OsMASMA, OsMAPrice, 0);
    switch (side)
    {
-      case UP:
+      case OP_BUY:
          return (osma <= -OsMAHedgeValue);
-      case DOWN:
+      case OP_SELL:
          return (osma >= OsMAHedgeValue);        
    }
    return (false);
@@ -943,9 +951,9 @@ bool IsACAllowHedge(int side)
    double ac = iAC(Symbol(), ACTimeframe, 0);
    switch (side)
    {
-      case UP:
+      case OP_BUY:
          return (ac <= -ACHedgeValue);
-      case DOWN:
+      case OP_SELL:
          return (ac >= ACHedgeValue);         
    }
    return (false);
@@ -960,7 +968,7 @@ int GetHedgeIndicatorLine(int side)
 
    switch (side)
    {        
-      case UP:
+      case OP_BUY:
          double slValue = GetHedgeSL(DownHedgeStopLossLine, AdditionalHedgeReenterPips);                  
          if (slValue < (Ask + stopLevel))
          {
@@ -977,7 +985,7 @@ int GetHedgeIndicatorLine(int side)
          }      
          break;
          
-      case DOWN:
+      case OP_SELL:
          slValue = GetHedgeSL(UpHedgeStopLossLine, -AdditionalHedgeReenterPips);
          if (slValue >= (Bid + stopLevel))
          {
@@ -1070,6 +1078,8 @@ void TrailingHedgeByIndicatorLine(int magic, int type, int attempts = 5)
 //+------------------------------------------------------------------+
 bool IsUnrealizedLoss(int side)
 {
+   if (!UseUnrealizedLoss)
+      return (true);
    double loss = GetTargetLossByPercent(side, UnrealizedLoss);
    loss *= -1;
    if (GetOrdersProfitBySide(side) <= loss)
@@ -1080,19 +1090,43 @@ bool IsUnrealizedLoss(int side)
 //+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
+bool IsUnrealizedPips(int side)
+{
+   if (!UseUnrealizedPips)
+      return (true);
+   
+   switch (side)
+   {
+      case OP_BUY:
+         if (Ask >= (startSessionPrice[side] + UnrealizedPips*Point))
+            return (true);
+         break;
+      case OP_SELL:
+         if (Bid <= (startSessionPrice[side] - UnrealizedPips*Point))
+            return (true);
+         break;
+   }
+      
+   return (false);
+}
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
 bool IsCriticalLoss(int side)
 {
+   if (!UseCriticalLoss)
+      return (false);
    double loss = GetTargetLossByPercent(side, CriticalLoss);
    loss *= -1;
    
    double totalProfit = 0;
    switch (side)
    {
-      case UP:
-         totalProfit += GetHedgeProfitFromHistory(UP, startSession[0]);
+      case OP_BUY:
+         totalProfit += GetHedgeProfitFromHistory(OP_BUY, startSessionTime[0]);
          break;
-      case DOWN:
-         totalProfit += GetHedgeProfitFromHistory(DOWN, startSession[1]);
+      case OP_SELL:
+         totalProfit += GetHedgeProfitFromHistory(OP_SELL, startSessionTime[1]);
          break;  
    }
    totalProfit += GetOrdersProfitBySide(side);
@@ -1113,18 +1147,18 @@ double GetTargetLossByPercent(int side, double percent)
    double loss = 0; 
    switch (side)
    {
-      case UP:
-         if (startMoney[0] == -1)
+      case OP_BUY:
+         if (startSessionMoney[0] == -1)
             loss = 0;     
          else
-            loss = startMoney[0] * (percent / 100);
+            loss = startSessionMoney[0] * (percent / 100);
          break;
          
-      case DOWN:
-         if (startMoney[1] == -1)
+      case OP_SELL:
+         if (startSessionMoney[1] == -1)
             loss = 0;
          else
-            loss = startMoney[1] * (percent / 100);         
+            loss = startSessionMoney[1] * (percent / 100);         
          break;
    }   
    return (loss);
@@ -1187,14 +1221,14 @@ int GetOrdersCountBySide(int side)
    int count = 0;
    switch (side)
    {
-      case UP:
+      case OP_BUY:
          count = GetOrdersCount(magicSimple[0], OP_BUY)
                  + GetOrdersCount(magicMultiple[0], OP_BUY)
                  + GetOrdersCount(magicHedge[0], OP_SELL)
                  + GetOrdersCount(magicRestriction[0], OP_SELL)
                  + GetOrdersCount(magicRestriction[0], OP_BUY);   
          break;   
-      case DOWN:
+      case OP_SELL:
          count = GetOrdersCount(magicSimple[1], OP_SELL)
                  + GetOrdersCount(magicMultiple[1], OP_SELL)
                  + GetOrdersCount(magicHedge[1], OP_BUY)
@@ -1235,7 +1269,7 @@ double GetOrdersProfitBySide(int side)
       if (OrderSelect(i, SELECT_BY_POS))
       {
          if (OrderSymbol() != Symbol()) continue; 
-         if (side == UP)
+         if (side == OP_BUY)
          {
             if ((OrderMagicNumber() != magicSimple[0]) 
                 && (OrderMagicNumber() != magicMultiple[0])
@@ -1243,7 +1277,7 @@ double GetOrdersProfitBySide(int side)
                 && (OrderMagicNumber() != magicRestriction[0]))
                continue;   
          }     
-         if (side == DOWN)
+         if (side == OP_SELL)
          {
             if ((OrderMagicNumber() != magicSimple[1]) 
                 && (OrderMagicNumber() != magicMultiple[1])
@@ -1267,7 +1301,7 @@ double GetOrdersLotsBySide(int side)
       if (OrderSelect(i, SELECT_BY_POS))
       {
          if (OrderSymbol() != Symbol()) continue;
-         if (side == UP)
+         if (side == OP_BUY)
          {            
             if ((OrderMagicNumber() != magicSimple[0]) 
                 && (OrderMagicNumber() != magicMultiple[0])
@@ -1275,7 +1309,7 @@ double GetOrdersLotsBySide(int side)
                 && (OrderMagicNumber() != magicRestriction[0]))
                continue;   
          }     
-         if (side == DOWN)
+         if (side == OP_SELL)
          {
             if ((OrderMagicNumber() != magicSimple[1]) 
                 && (OrderMagicNumber() != magicMultiple[1])
@@ -1302,7 +1336,7 @@ double GetOrdersLots(int side, int type)
          if (OrderSymbol() != Symbol()) continue;
          if (OrderType() != type) continue;
          
-         if (side == UP)
+         if (side == OP_BUY)
          {            
             if ((OrderMagicNumber() != magicSimple[0]) 
                 && (OrderMagicNumber() != magicMultiple[0])
@@ -1310,7 +1344,7 @@ double GetOrdersLots(int side, int type)
                 && (OrderMagicNumber() != magicRestriction[0]))
                continue;   
          }     
-         if (side == DOWN)
+         if (side == OP_SELL)
          {
             if ((OrderMagicNumber() != magicSimple[1]) 
                 && (OrderMagicNumber() != magicMultiple[1])
@@ -1338,14 +1372,14 @@ double GetHedgeProfitFromHistory(int side, datetime time)
          if (OrderSymbol() != Symbol()) continue;
          switch (side)  
          {
-            case UP:
+            case OP_BUY:
                if ((OrderMagicNumber() != magicHedge[0])
                    && (OrderMagicNumber() != magicRestriction[0]))
                   continue;
                if (OrderType() != OP_SELL)   
                   continue;
                break;
-            case DOWN:
+            case OP_SELL:
                if ((OrderMagicNumber() != magicHedge[1])
                    && (OrderMagicNumber() != magicRestriction[1]))
                   continue;
@@ -1431,8 +1465,8 @@ bool IsLastRestrictionOrderSameType(int side, int orderType, datetime time)
 	      
       switch (side)
       {
-         case UP:
-            if (OrderMagicNumber() == magicRestriction[UP]) 
+         case OP_BUY:
+            if (OrderMagicNumber() == magicRestriction[OP_BUY]) 
             {
                if (maxOpenDate < OrderOpenTime())
                {
@@ -1441,8 +1475,8 @@ bool IsLastRestrictionOrderSameType(int side, int orderType, datetime time)
                }
             }
             break;
-         case DOWN:
-            if (OrderMagicNumber() != magicRestriction[DOWN]) 
+         case OP_SELL:
+            if (OrderMagicNumber() != magicRestriction[OP_SELL]) 
             {
                if (maxOpenDate < OrderOpenTime())
                {
@@ -1465,8 +1499,8 @@ bool IsLastRestrictionOrderSameType(int side, int orderType, datetime time)
 	      
       switch (side)
       {
-         case UP:
-            if (OrderMagicNumber() == magicRestriction[UP]) 
+         case OP_BUY:
+            if (OrderMagicNumber() == magicRestriction[OP_BUY]) 
             {
                if (maxOpenDate < OrderOpenTime())
                {
@@ -1475,8 +1509,8 @@ bool IsLastRestrictionOrderSameType(int side, int orderType, datetime time)
                }
             }
             break;
-         case DOWN:
-            if (OrderMagicNumber() != magicRestriction[DOWN]) 
+         case OP_SELL:
+            if (OrderMagicNumber() != magicRestriction[OP_SELL]) 
             {
                if (maxOpenDate < OrderOpenTime())
                {
@@ -1502,8 +1536,8 @@ string SideToString(int side)
 {
    switch (side)
    {
-      case UP: return ("UP");
-      case DOWN: return ("DOWN");
+      case OP_BUY: return ("OP_BUY");
+      case OP_SELL: return ("OP_SELL");
    }
    return ("");
 }
@@ -1520,16 +1554,15 @@ void ShowCriticalAlertAndStop(string alertText)
 //+------------------------------------------------------------------+
 void ResetToDefault()
 {
-   openTrades[0] = 1;
-   openTrades[1] = 1;
-	startMoney[0] = -1;
-	startMoney[1] = -1;
-	startSession[0] = -1;
-	startSession[1] = -1;       
-	hedgeWasClosed[0] = -1;
-	hedgeWasClosed[1] = -1;
-	hedgeCapturedSl[0] = UpHedgeStopLossLine;
-	hedgeCapturedSl[1] = DownHedgeStopLossLine;
+   for (int side = 0; side < 2; side++)
+   {
+      openTrades[side] = 1;
+	   startSessionMoney[side] = -1;
+	   startSessionTime[side] = -1;   
+	   hedgeWasClosed[side] = -1;
+	   hedgeCapturedSl[side] = UpHedgeStopLossLine;
+	   startSessionPrice[side] = -1;
+   }
 	MATimeframe = TranslatePeriod(MATimeframe);
 	BBTimeframe = TranslatePeriod(BBTimeframe);
 	OsMATimeframe = TranslatePeriod(OsMATimeframe);
@@ -1550,26 +1583,29 @@ void ResetToDefault()
 //+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
-void LoadSession()
+bool LoadSession()
 {
+   if (IsTesting())
+      return (false);
+
    int handle;
    handle = FileOpen(saveFileName, FILE_CSV | FILE_READ,';');   
    if(handle > 0)
    {
-      state[0] = FileReadNumber(handle);
-      startMoney[0] = FileReadNumber(handle);
-      startSession[0] = FileReadNumber(handle);
-      hedgeWasClosed[0] = FileReadNumber(handle);   
-      hedgeCapturedSl[0] = FileReadNumber(handle); 
-      openTrades[0] = FileReadNumber(handle); 
-      
-      state[1] = FileReadNumber(handle);
-      startMoney[1] = FileReadNumber(handle);
-      startSession[0] = FileReadNumber(handle);
-      hedgeWasClosed[1] = FileReadNumber(handle); 
-      hedgeCapturedSl[1] = FileReadNumber(handle); 
-      openTrades[1] = FileReadNumber(handle); 
+      int result = MessageBox("EA has found previous session. Does it need to load it?", "Load session", MB_YESNO|MB_ICONQUESTION);
+      if (result == IDYES)
+         for (int side = 0; side < 2; side++)
+         {
+            state[side] = FileReadNumber(handle);
+            startSessionMoney[side] = FileReadNumber(handle);
+            startSessionTime[side] = FileReadNumber(handle);
+            startSessionPrice[side] = FileReadNumber(handle);
+            hedgeWasClosed[side] = FileReadNumber(handle);   
+            hedgeCapturedSl[side] = FileReadNumber(handle); 
+            openTrades[side] = FileReadNumber(handle); 
+         }
       FileClose(handle);
+      return (result == IDYES);
    }
 }
 //+------------------------------------------------------------------+
@@ -1582,8 +1618,8 @@ void SaveSession()
    if(handle > 0)
    {
       FileWrite(handle, 
-               state[0], startMoney[0], startSession[0], hedgeWasClosed[0], hedgeCapturedSl[0], openTrades[0],
-               state[1], startMoney[1], startSession[1], hedgeWasClosed[1], hedgeCapturedSl[1], openTrades[1]);
+               state[0], startSessionMoney[0], startSessionTime[0], startSessionPrice[0], hedgeWasClosed[0], hedgeCapturedSl[0], openTrades[0],
+               state[1], startSessionMoney[1], startSessionTime[1], startSessionPrice[1], hedgeWasClosed[1], hedgeCapturedSl[1], openTrades[1]);
       FileClose(handle);
    }
 }
@@ -1601,11 +1637,11 @@ double GetRestrictionLots(int side, int orderType, double targetPrice, double pe
          pipsDistance = (targetPrice - Ask) / Point;
          switch (side)
          {
-            case UP:
-               currentLots = GetOrdersLots(UP, OP_BUY) - GetOrdersLots(UP, OP_SELL);
+            case OP_BUY:
+               currentLots = GetOrdersLots(OP_BUY, OP_BUY) - GetOrdersLots(OP_BUY, OP_SELL);
                break;
-            case DOWN:
-               currentLots = GetOrdersLots(DOWN, OP_SELL) - GetOrdersLots(DOWN, OP_BUY);
+            case OP_SELL:
+               currentLots = GetOrdersLots(OP_SELL, OP_SELL) - GetOrdersLots(OP_SELL, OP_BUY);
                break;
          }
          break;
@@ -1613,11 +1649,11 @@ double GetRestrictionLots(int side, int orderType, double targetPrice, double pe
          pipsDistance = (Bid - targetPrice) / Point;
          switch (side)
          {
-            case UP:
-               currentLots = GetOrdersLots(UP, OP_BUY) - GetOrdersLots(UP, OP_SELL);
+            case OP_BUY:
+               currentLots = GetOrdersLots(OP_BUY, OP_BUY) - GetOrdersLots(OP_BUY, OP_SELL);
                break;
-            case DOWN:
-               currentLots = GetOrdersLots(DOWN, OP_SELL) - GetOrdersLots(DOWN, OP_BUY);
+            case OP_SELL:
+               currentLots = GetOrdersLots(OP_SELL, OP_SELL) - GetOrdersLots(OP_SELL, OP_BUY);
                break;
          }
          break;         
@@ -1634,7 +1670,7 @@ double GetRestrictionLots(int side, int orderType, double targetPrice, double pe
       case 3: moneyForOnePoint = 100; break;
    }   
    
-   double currentProfit = GetOrdersProfitBySide(side) + GetHedgeProfitFromHistory(side, startSession[side]); 
+   double currentProfit = GetOrdersProfitBySide(side) + GetHedgeProfitFromHistory(side, startSessionTime[side]); 
    double tickSize = currentLots * moneyForOnePoint;
    if (orderType != side)
       tickSize *= -1;
@@ -1723,10 +1759,8 @@ bool TryClose(int magic, int type)
          while(k < 5)
          {
             RefreshRates();
-            if (OrderClose(OrderTicket(), OrderLots(), OrderClosePrice(), 100)) 
-            {
+            if (OrderClose(OrderTicket(), OrderLots(), OrderClosePrice(), 100))
                return (true);
-            }   
             k++;
          }             
       }
@@ -1811,37 +1845,37 @@ void ShowStatistics()
       {
          case SIMPLE:
             upSideComment = "     Target take profit: " + DoubleToStr(GetLastOrderOpenPrice(magicSimple[0], OP_BUY) + TakeProfit * Point, Digits) + "\n";
-            double targetUnresizedLoss = startMoney[0] - GetTargetLossByPercent(UP, UnrealizedLoss);
+            double targetUnresizedLoss = startSessionMoney[0] - GetTargetLossByPercent(OP_BUY, UnrealizedLoss);
             upSideComment = upSideComment + "     Target unrealized loss: " + DoubleToStr(targetUnresizedLoss, 2) + "\n";
-            currentTotalProfitUp = GetOrdersProfitBySide(UP);
+            currentTotalProfitUp = GetOrdersProfitBySide(OP_BUY);
             break;
          case BREAK_EVEN:   
             upSideComment = "     In Break even\n";      
-            currentTotalProfitUp = GetOrdersProfitBySide(UP);
+            currentTotalProfitUp = GetOrdersProfitBySide(OP_BUY);
             break;
          case MULTIPLE:
-            currentTotalProfitUp = GetOrdersProfitBySide(UP);                                            
-            upSideComment = "     Target break even trigger: " + DoubleToStr(GetOrdersLotsBySide(UP) * ProfitPerLot, 2) + " $\n";
-            targetUnresizedLoss = startMoney[0] - GetTargetLossByPercent(UP, UnrealizedLoss);
+            currentTotalProfitUp = GetOrdersProfitBySide(OP_BUY);                                            
+            upSideComment = "     Target break even trigger: " + DoubleToStr(GetOrdersLotsBySide(OP_BUY) * ProfitPerLot, 2) + " $\n";
+            targetUnresizedLoss = startSessionMoney[0] - GetTargetLossByPercent(OP_BUY, UnrealizedLoss);
             upSideComment = upSideComment + "     Target unrealized loss: " + DoubleToStr(targetUnresizedLoss, 2) + "\n";                                         
             break;   
             
          case HEDGE:             
          case RESTRICTION_HEDGE:    
          case RESTRICTION_INITIAL: 
-            double currentProfit = GetOrdersProfitBySide(UP); 
-            double previousProfit = GetHedgeProfitFromHistory(UP, startSession[0]);                 
+            double currentProfit = GetOrdersProfitBySide(OP_BUY); 
+            double previousProfit = GetHedgeProfitFromHistory(OP_BUY, startSessionTime[0]);                 
             currentTotalProfitUp = currentProfit + previousProfit;
                                        
             upSideComment = "     Live profit: " + DoubleToStr(currentProfit, 2) + " $\n"; 
             upSideComment = upSideComment + "     Balance of previous hedge orders: " + DoubleToStr(previousProfit, 2) + " $\n";                 
-            upSideComment = upSideComment + "     Target break even trigger: " + DoubleToStr(GetOrdersLotsBySide(UP) * ProfitPerLot, 2) + " $\n";                 
+            upSideComment = upSideComment + "     Target break even trigger: " + DoubleToStr(GetOrdersLotsBySide(OP_BUY) * ProfitPerLot, 2) + " $\n";                 
             upSideComment = upSideComment + "     Stop loss uses: " + StopLossModeToString(hedgeCapturedSl[0]) + "\n";
          
             bool isHedgeOrderExist = GetOrdersCount(magicHedge[0], OP_SELL) != 0;
             if ((hedgeWasClosed[0] == 1) && !isHedgeOrderExist)
             {
-               upSideComment = upSideComment + "     Hedge previous price: " + DoubleToStr(GetLastHedgeClosePrice(magicHedge[0], OP_SELL, startSession[0]), Digits) + "\n";                                        
+               upSideComment = upSideComment + "     Hedge previous price: " + DoubleToStr(GetLastHedgeClosePrice(magicHedge[0], OP_SELL, startSessionTime[0]), Digits) + "\n";                                        
             }   
             if (isHedgeOrderExist)
                upSideComment = upSideComment + "     Hedge stop loss: " + DoubleToStr(GetLastHedgeOrderStopLoss(magicHedge[0], OP_SELL), Digits) + "\n";                                                                                        
@@ -1871,7 +1905,7 @@ void ShowStatistics()
             }   
             break;   
       }
-      double targetCriticalLoss = startMoney[0] - GetTargetLossByPercent(UP, CriticalLoss);
+      double targetCriticalLoss = startSessionMoney[0] - GetTargetLossByPercent(OP_BUY, CriticalLoss);
       upSideComment = upSideComment + "     Target critical loss: " + DoubleToStr(targetCriticalLoss, 2) + "\n";        
 
 
@@ -1882,36 +1916,36 @@ void ShowStatistics()
       {
          case SIMPLE:
             downSideComment = "     Target take profit: " + DoubleToStr(GetLastOrderOpenPrice(magicSimple[1], OP_SELL) - TakeProfit * Point, Digits) + "\n";
-            targetUnresizedLoss = startMoney[1] - GetTargetLossByPercent(DOWN, UnrealizedLoss);
+            targetUnresizedLoss = startSessionMoney[1] - GetTargetLossByPercent(OP_SELL, UnrealizedLoss);
             downSideComment = downSideComment + "     Target unrealized loss: " + DoubleToStr(targetUnresizedLoss, 2) + "\n";               
-            currentTotalProfitDown = GetOrdersProfitBySide(DOWN);
+            currentTotalProfitDown = GetOrdersProfitBySide(OP_SELL);
             break;
          case BREAK_EVEN:   
             downSideComment = "     In Break even\n";
-            currentTotalProfitDown = GetOrdersProfitBySide(DOWN);
+            currentTotalProfitDown = GetOrdersProfitBySide(OP_SELL);
             break;
          case MULTIPLE:
-            currentTotalProfitDown = GetOrdersProfitBySide(DOWN);
-            downSideComment = "     Target break even trigger: " + DoubleToStr(GetOrdersLotsBySide(DOWN) * ProfitPerLot, 2) + " $\n";
-            targetUnresizedLoss = startMoney[1] - GetTargetLossByPercent(DOWN, UnrealizedLoss);
+            currentTotalProfitDown = GetOrdersProfitBySide(OP_SELL);
+            downSideComment = "     Target break even trigger: " + DoubleToStr(GetOrdersLotsBySide(OP_SELL) * ProfitPerLot, 2) + " $\n";
+            targetUnresizedLoss = startSessionMoney[1] - GetTargetLossByPercent(OP_SELL, UnrealizedLoss);
             downSideComment = downSideComment + "     Target unrealized loss: " + DoubleToStr(targetUnresizedLoss, 2) + "\n";                  
             break;                 
          case HEDGE:           
          case RESTRICTION_HEDGE:  
          case RESTRICTION_INITIAL: 
-            currentProfit = GetOrdersProfitBySide(DOWN);              
-            previousProfit = GetHedgeProfitFromHistory(DOWN, startSession[1]);               
+            currentProfit = GetOrdersProfitBySide(OP_SELL);              
+            previousProfit = GetHedgeProfitFromHistory(OP_SELL, startSessionTime[1]);               
             currentTotalProfitDown = currentProfit + previousProfit;                                                          
                                   
             downSideComment = "     Live profit: " + DoubleToStr(currentProfit, 2) + " $\n";                       
             downSideComment = downSideComment + "     Balance of previous hedge orders: " + DoubleToStr(previousProfit, 2) + " $\n";                
-            downSideComment = downSideComment + "     Target break even trigger: " + DoubleToStr(GetOrdersLotsBySide(DOWN) * ProfitPerLot, 2) + " $\n";                                     
+            downSideComment = downSideComment + "     Target break even trigger: " + DoubleToStr(GetOrdersLotsBySide(OP_SELL) * ProfitPerLot, 2) + " $\n";                                     
             downSideComment = downSideComment + "     Stop loss uses: " + StopLossModeToString(hedgeCapturedSl[1]) + "\n";
          
             isHedgeOrderExist = GetOrdersCount(magicHedge[1], OP_BUY) != 0;
             if ((hedgeWasClosed[1] == 1) && !isHedgeOrderExist)
             {                                       
-               downSideComment = downSideComment + "     Hedge previous price: " + DoubleToStr(GetLastHedgeClosePrice(magicHedge[1], OP_BUY, startSession[1]), Digits) + "\n";
+               downSideComment = downSideComment + "     Hedge previous price: " + DoubleToStr(GetLastHedgeClosePrice(magicHedge[1], OP_BUY, startSessionTime[1]), Digits) + "\n";
             }   
             if (isHedgeOrderExist)
                downSideComment = downSideComment + "     Hedge stop loss: " + DoubleToStr(GetLastHedgeOrderStopLoss(magicHedge[1], OP_BUY), Digits) + "\n";                     
@@ -1942,7 +1976,7 @@ void ShowStatistics()
             break;   
       }   
       
-      targetCriticalLoss = startMoney[1] - GetTargetLossByPercent(DOWN, CriticalLoss);
+      targetCriticalLoss = startSessionMoney[1] - GetTargetLossByPercent(OP_SELL, CriticalLoss);
       downSideComment = downSideComment + "     Target critical loss: " + DoubleToStr(targetCriticalLoss, 2) + "\n";        
       
       comment = comment + 
@@ -1957,14 +1991,14 @@ void ShowStatistics()
       comment = comment + 
            "---------------------------------------------------------\n" +
            "Up side\n" +
-           "     Account balance at the session start: " + DoubleToStr(startMoney[0], 2) + "\n" +
-           "     Lots: " + DoubleToStr(GetOrdersLotsBySide(UP), 2) + "\n" +
+           "     Account balance at the session start: " + DoubleToStr(startSessionMoney[0], 2) + "\n" +
+           "     Lots: " + DoubleToStr(GetOrdersLotsBySide(OP_SELL), 2) + "\n" +
            "     Current total profit: " + DoubleToStr(currentTotalProfitUp, 2) + " $\n" +
            upSideComment +
            "=========================\n" +
            "Down side\n" +
-           "     Account balance at the session start: " + DoubleToStr(startMoney[1], 2) + "\n" +
-           "     Lots: " + DoubleToStr(GetOrdersLotsBySide(DOWN), 2) + "\n" +
+           "     Account balance at the session start: " + DoubleToStr(startSessionMoney[1], 2) + "\n" +
+           "     Lots: " + DoubleToStr(GetOrdersLotsBySide(OP_SELL), 2) + "\n" +
            "     Current total profit: " + DoubleToStr(currentTotalProfitDown, 2) + " $\n" +              
            downSideComment;
    }
