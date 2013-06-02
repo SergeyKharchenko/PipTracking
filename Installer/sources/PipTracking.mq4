@@ -57,6 +57,7 @@ extern string    MAMethod_Help_2   = "1 - Exponential moving average";
 extern string    MAMethod_Help_3   = "2 - Smoothed moving average";
 extern string    MAMethod_Help_4   = "3 - Linear weighted moving average";
 extern int       MAMethod          = 0;
+
 extern int       MAShift           = 0;
 extern int       BBPeriod          = 20;
 extern int       BBDeviation       = 1;
@@ -88,6 +89,9 @@ extern double    OsMAHedgeValue   = 0.0001;
 
 extern bool      UseAC        = true;
 extern double    ACHedgeValue = 0.0001;
+
+extern bool      UseBBMinDistance   = true;
+extern double    BBMinDistance      = 0.0002;
 
 extern string    IndicatorTimeframe_Help_1  = "0 - Timeframe used on the chart";
 extern string    IndicatorTimeframe_Help_2  = "1 - 1 minute";
@@ -247,11 +251,15 @@ int init()
 		ShowCriticalAlertAndStop("ACTimeframe is invalid");
    
    if ((InitialRestrictionPips * Point) < (Ask - Bid)) 
-		ShowCriticalAlertAndStop("InitialRestrictionPips is invalid");  
+		ShowCriticalAlertAndStop("InitialRestrictionPips is less than spread");  
 		
    if ((HedgeRestrictionPips * Point) < (Ask - Bid)) 
-		ShowCriticalAlertAndStop("InitialRestrictionPips is invalid"); 		
+		ShowCriticalAlertAndStop("InitialRestrictionPips is less than spread"); 		
 		  
+   if ((BBMinDistance < 0) && UseBBMinDistance)
+		ShowCriticalAlertAndStop("BBMinDistance is invalid");	
+   
+   
    
    double lot = NormalizeLots(LotSize, Symbol());
 
@@ -502,6 +510,9 @@ int GetOpenState(int side)
 		
 	if (IsOpenMultiple(side))
 		return (MULTIPLE);	
+		
+	if (!IsBBDistanceAllowTrade())
+	  return (-1);
 	
 	if (IsOpenFirstHedge(side))
 		return (HEDGE);	
@@ -526,25 +537,28 @@ bool IsOpenSimple(int side)
 //+------------------------------------------------------------------+
 bool IsOpenMultiple(int side)
 {
-	if (IsUnrealizedLoss(side))
+	if (IsUnrealizedLoss(side) || IsUnrealizedPips(side))
 		return (false);
+	Alert(111111);	
 	switch (side)
 	{
 		case OP_BUY:
 			if (hedgeWasClosed[0] != -1)
 				return (false);
-				double lastOrderOpenPrice = MathMinBlocked(GetLastOrderOpenPrice(magicSimple[0], OP_BUY),
-																		 GetLastOrderOpenPrice(magicMultiple[0], OP_BUY), -1);	
-				if (((Ask + PipStep * Point) <= lastOrderOpenPrice) && (lastOrderOpenPrice != -1))
-					return (true);  
+				
+			double lastOrderOpenPrice = MathMinBlocked(GetLastOrderOpenPrice(magicSimple[0], OP_BUY),
+																	 GetLastOrderOpenPrice(magicMultiple[0], OP_BUY), -1);	
+			if (((Ask + PipStep * Point) <= lastOrderOpenPrice) && (lastOrderOpenPrice != -1))
+				return (true);  
 			break;
 		case OP_SELL:
 			if (hedgeWasClosed[1] != -1)
-				return (false);		
-				lastOrderOpenPrice = MathMax(GetLastOrderOpenPrice(magicSimple[1], OP_SELL),
-													  GetLastOrderOpenPrice(magicMultiple[1], OP_SELL));
-				if ((Bid - PipStep * Point) >= lastOrderOpenPrice)
-					return (true); 
+				return (false);	
+					
+			lastOrderOpenPrice = MathMax(GetLastOrderOpenPrice(magicSimple[1], OP_SELL),
+												  GetLastOrderOpenPrice(magicMultiple[1], OP_SELL));
+			if ((Bid - PipStep * Point) >= lastOrderOpenPrice)
+				return (true); 
 			break;			
 	}
 	return (false);
@@ -552,9 +566,24 @@ bool IsOpenMultiple(int side)
 //+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
+bool IsBBDistanceAllowTrade()
+{
+   if (!UseBBMinDistance)
+      return (true);
+   
+   double      
+      bbLow = iBands(Symbol(), BBTimeframe, BBPeriod, BBDeviation, BBShift, BBPrice, MODE_LOWER, 0),
+      bbHigh = iBands(Symbol(), BBTimeframe, BBPeriod, BBDeviation, BBShift, BBPrice, MODE_UPPER, 0),
+      distance = MathAbs(bbHigh - bbLow);
+      
+   return (distance >= BBMinDistance); 
+}
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
 bool IsOpenFirstHedge(int side)
 {
-	if (!IsUnrealizedLoss(side) || !IsUnrealizedPips(side))
+	if (!IsUnrealizedLoss(side) && !IsUnrealizedPips(side))
 		return (false);				
 		
 	if (hedgeWasClosed[side] != -1)
@@ -1176,7 +1205,7 @@ int GetLastOrderTicket(int magic, int type, int mode)
    int orderOpenTime = 0;
    int ticket = 0;
    
-   switch (mode == MODE_HISTORY)
+   switch (mode)
    {
       case MODE_TRADES:
          for (int i = OrdersTotal() - 1; i >= 0; i--)  
@@ -1476,7 +1505,7 @@ bool IsLastRestrictionOrderSameType(int side, int orderType, datetime time)
             }
             break;
          case OP_SELL:
-            if (OrderMagicNumber() != magicRestriction[OP_SELL]) 
+            if (OrderMagicNumber() == magicRestriction[OP_SELL]) 
             {
                if (maxOpenDate < OrderOpenTime())
                {
@@ -1510,7 +1539,7 @@ bool IsLastRestrictionOrderSameType(int side, int orderType, datetime time)
             }
             break;
          case OP_SELL:
-            if (OrderMagicNumber() != magicRestriction[OP_SELL]) 
+            if (OrderMagicNumber() == magicRestriction[OP_SELL]) 
             {
                if (maxOpenDate < OrderOpenTime())
                {
@@ -1536,8 +1565,8 @@ string SideToString(int side)
 {
    switch (side)
    {
-      case OP_BUY: return ("OP_BUY");
-      case OP_SELL: return ("OP_SELL");
+      case OP_BUY: return ("BUY");
+      case OP_SELL: return ("SELL");
    }
    return ("");
 }
@@ -1585,7 +1614,7 @@ void ResetToDefault()
 //+------------------------------------------------------------------+
 bool LoadSession()
 {
-   if (IsTesting())
+   if (IsTesting() || !work)
       return (false);
 
    int handle;
@@ -1613,6 +1642,8 @@ bool LoadSession()
 //+------------------------------------------------------------------+
 void SaveSession()
 {
+   if (!work)
+      return;
    int handle;
    handle = FileOpen(saveFileName, FILE_CSV | FILE_WRITE,';');
    if(handle > 0)
