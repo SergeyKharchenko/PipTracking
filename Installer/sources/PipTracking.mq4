@@ -92,6 +92,8 @@ extern double    ACHedgeValue = 0.0001;
 
 extern bool      UseBBMinDistance   = true;
 extern double    BBMinDistance      = 0.0002;
+extern bool      UseVolumes         = true;
+extern int       VolumesValue       = 3000;
 
 extern string    IndicatorTimeframe_Help_1  = "0 - Timeframe used on the chart";
 extern string    IndicatorTimeframe_Help_2  = "1 - 1 minute";
@@ -107,6 +109,7 @@ extern int       MATimeframe   = 0;
 extern int       BBTimeframe   = 0;
 extern int       OsMATimeframe = 0;
 extern int       ACTimeframe   = 0;
+extern int       VolumesTimeframe   = 0;
                                 
 extern string    AdditionalSettings = "------------------------------------------------";                           
 extern bool      ShowAlerts         = true;
@@ -249,6 +252,9 @@ int init()
    
    if ((ACTimeframe < 0) || (ACTimeframe > 9)) 
 		ShowCriticalAlertAndStop("ACTimeframe is invalid");
+		
+   if ((VolumesTimeframe < 0) || (VolumesTimeframe > 9)) 
+		ShowCriticalAlertAndStop("VolumesTimeframe is invalid");		
    
    if ((InitialRestrictionPips * Point) < (Ask - Bid)) 
 		ShowCriticalAlertAndStop("InitialRestrictionPips is less than spread");  
@@ -258,7 +264,9 @@ int init()
 		  
    if ((BBMinDistance < 0) && UseBBMinDistance)
 		ShowCriticalAlertAndStop("BBMinDistance is invalid");	
-   
+		
+   if ((VolumesValue < 0) && UseVolumes)
+		ShowCriticalAlertAndStop("VolumesValue is invalid");   
    
    
    double lot = NormalizeLots(LotSize, Symbol());
@@ -539,7 +547,7 @@ bool IsOpenMultiple(int side)
 {
 	if (IsUnrealizedLoss(side) || IsUnrealizedPips(side))
 		return (false);
-	Alert(111111);	
+	
 	switch (side)
 	{
 		case OP_BUY:
@@ -568,15 +576,24 @@ bool IsOpenMultiple(int side)
 //+------------------------------------------------------------------+
 bool IsBBDistanceAllowTrade()
 {
-   if (!UseBBMinDistance)
-      return (true);
+   if (UseBBMinDistance)
+   {
+      double      
+         bbLow = iBands(Symbol(), BBTimeframe, BBPeriod, BBDeviation, BBShift, BBPrice, MODE_LOWER, 0),
+         bbHigh = iBands(Symbol(), BBTimeframe, BBPeriod, BBDeviation, BBShift, BBPrice, MODE_UPPER, 0),
+         distance = MathAbs(bbHigh - bbLow);
+      if (distance < BBMinDistance)
+         return (false);
+   }
    
-   double      
-      bbLow = iBands(Symbol(), BBTimeframe, BBPeriod, BBDeviation, BBShift, BBPrice, MODE_LOWER, 0),
-      bbHigh = iBands(Symbol(), BBTimeframe, BBPeriod, BBDeviation, BBShift, BBPrice, MODE_UPPER, 0),
-      distance = MathAbs(bbHigh - bbLow);
-      
-   return (distance >= BBMinDistance); 
+   if (UseVolumes)
+   {
+      double volume = iVolume(Symbol(), VolumesTimeframe, 0);      
+      if (volume < VolumesValue)
+         return (false);
+   }
+   
+   return (true); 
 }
 //+------------------------------------------------------------------+
 
