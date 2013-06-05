@@ -588,7 +588,7 @@ bool IsBBDistanceAllowTrade()
    
    if (UseVolumes)
    {
-      double volume = iVolume(Symbol(), VolumesTimeframe, 0);      
+      double volume = iVolume(Symbol(), VolumesTimeframe, 0);     
       if (volume < VolumesValue)
          return (false);
    }
@@ -601,7 +601,7 @@ bool IsBBDistanceAllowTrade()
 bool IsOpenFirstHedge(int side)
 {
 	if (!IsUnrealizedLoss(side) && !IsUnrealizedPips(side))
-		return (false);				
+		return (false);				 
 		
 	if (hedgeWasClosed[side] != -1)
 		return (false);
@@ -941,7 +941,7 @@ bool IsTakeProfitForSimpleState(int side)
       case OP_BUY:
          if (Bid >= (GetLastOrderOpenPrice(magicSimple[0], OP_BUY) + TakeProfit * Point))
          {
-            Notify("Take profit point has been reached by OP_BUY side"); 
+            Notify("Take profit point has been reached by BUY side"); 
             if (!OpenTrades)   
                openTrades[OP_BUY] = 0;
             return (true);
@@ -951,7 +951,7 @@ bool IsTakeProfitForSimpleState(int side)
       case OP_SELL:
          if (Ask <= (GetLastOrderOpenPrice(magicSimple[1], OP_SELL) - TakeProfit * Point))
          {
-            Notify("Take profit point has been reached by OP_SELL side");
+            Notify("Take profit point has been reached by SELL side");
             if (!OpenTrades)
                openTrades[OP_SELL] = 0;
             return (true);
@@ -1613,6 +1613,7 @@ void ResetToDefault()
 	BBTimeframe = TranslatePeriod(BBTimeframe);
 	OsMATimeframe = TranslatePeriod(OsMATimeframe);
 	ACTimeframe = TranslatePeriod(ACTimeframe);
+	VolumesTimeframe = TranslatePeriod(VolumesTimeframe);
 	
    int magic = MagicNumber * 10;
    magicSimple[0] = magic;
