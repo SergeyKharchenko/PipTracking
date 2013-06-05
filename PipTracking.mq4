@@ -394,7 +394,7 @@ void OpenOrders(int side)
 {
 	int newState = GetOpenState(side);
 	if (newState == -1)
-		return;			
+		return;	
 	
 	double lot = CalculateLotByState(side, newState);  
 	if (lot == -1) 
@@ -509,7 +509,7 @@ int GetOpenState(int side)
 	  return (-1);
 	  
 	if ((side == OP_SELL) && !UseDownSide)
-	  return (-1);
+	  return (-1);		
 		
    RefreshRates();
    
@@ -1125,7 +1125,7 @@ void TrailingHedgeByIndicatorLine(int magic, int type, int attempts = 5)
 bool IsUnrealizedLoss(int side)
 {
    if (!UseUnrealizedLoss)
-      return (true);
+      return (false);
    double loss = GetTargetLossByPercent(side, UnrealizedLoss);
    loss *= -1;
    if (GetOrdersProfitBySide(side) <= loss)
@@ -1139,16 +1139,16 @@ bool IsUnrealizedLoss(int side)
 bool IsUnrealizedPips(int side)
 {
    if (!UseUnrealizedPips)
-      return (true);
+      return (false);
    
    switch (side)
    {
       case OP_BUY:
-         if (Ask >= (startSessionPrice[side] + UnrealizedPips*Point))
+         if (Ask <= (startSessionPrice[side] - UnrealizedPips*Point))
             return (true);
          break;
       case OP_SELL:
-         if (Bid <= (startSessionPrice[side] - UnrealizedPips*Point))
+         if (Bid >= (startSessionPrice[side] + UnrealizedPips*Point))
             return (true);
          break;
    }
