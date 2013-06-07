@@ -109,6 +109,7 @@ extern int       MATimeframe   = 0;
 extern int       BBTimeframe   = 0;
 extern int       OsMATimeframe = 0;
 extern int       ACTimeframe   = 0;
+extern int       BBMinDistanceTimeframe  = 0;
 extern int       VolumesTimeframe   = 0;
                                 
 extern string    AdditionalSettings = "------------------------------------------------";                           
@@ -249,6 +250,9 @@ int init()
    
    if ((OsMATimeframe < 0) || (OsMATimeframe > 9)) 
 		ShowCriticalAlertAndStop("OsMATimeframe is invalid");
+		
+   if ((BBMinDistanceTimeframe < 0) || (BBMinDistanceTimeframe > 9)) 
+		ShowCriticalAlertAndStop("BBMinDistanceTimeframe is invalid");				
    
    if ((ACTimeframe < 0) || (ACTimeframe > 9)) 
 		ShowCriticalAlertAndStop("ACTimeframe is invalid");
@@ -579,8 +583,8 @@ bool IsBBDistanceAllowTrade()
    if (UseBBMinDistance)
    {
       double      
-         bbLow = iBands(Symbol(), BBTimeframe, BBPeriod, BBDeviation, BBShift, BBPrice, MODE_LOWER, 0),
-         bbHigh = iBands(Symbol(), BBTimeframe, BBPeriod, BBDeviation, BBShift, BBPrice, MODE_UPPER, 0),
+         bbLow = iBands(Symbol(), BBMinDistanceTimeframe, BBPeriod, BBDeviation, BBShift, BBPrice, MODE_LOWER, 0),
+         bbHigh = iBands(Symbol(), BBMinDistanceTimeframe, BBPeriod, BBDeviation, BBShift, BBPrice, MODE_UPPER, 0),
          distance = MathAbs(bbHigh - bbLow);
       if (distance < BBMinDistance)
          return (false);
@@ -1613,6 +1617,7 @@ void ResetToDefault()
 	BBTimeframe = TranslatePeriod(BBTimeframe);
 	OsMATimeframe = TranslatePeriod(OsMATimeframe);
 	ACTimeframe = TranslatePeriod(ACTimeframe);
+	BBMinDistanceTimeframe = TranslatePeriod(BBMinDistanceTimeframe);
 	VolumesTimeframe = TranslatePeriod(VolumesTimeframe);
 	
    int magic = MagicNumber * 10;
@@ -2036,6 +2041,10 @@ void ShowStatistics()
          comment = comment + "OsMA uses timeframe: " + PeriodToString(OsMATimeframe) + "\n";
       if (UseAC)
          comment = comment + "AC uses timeframe: " + PeriodToString(ACTimeframe) + "\n";         
+      if (UseBBMinDistance)
+         comment = comment + "BBMinDistance uses timeframe: " + PeriodToString(BBMinDistanceTimeframe) + "\n";   
+      if (UseVolumes)
+         comment = comment + "Volumes uses timeframe: " + PeriodToString(UseVolumes) + "\n";               
            
       comment = comment + 
            "---------------------------------------------------------\n" +
