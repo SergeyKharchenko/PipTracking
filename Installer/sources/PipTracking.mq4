@@ -2044,7 +2044,7 @@ void ShowStatistics()
       if (UseBBMinDistance)
          comment = comment + "BBMinDistance uses timeframe: " + PeriodToString(BBMinDistanceTimeframe) + "\n";   
       if (UseVolumes)
-         comment = comment + "Volumes uses timeframe: " + PeriodToString(UseVolumes) + "\n";               
+         comment = comment + "Volumes uses timeframe: " + PeriodToString(VolumesTimeframe) + "\n";               
            
       comment = comment + 
            "---------------------------------------------------------\n" +
